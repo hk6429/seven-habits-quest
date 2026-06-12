@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { CLASSES, MAX_SEAT, HABITS, LEVELS_PER_HABIT, PASS_STARS, calcStars } from "@/lib/config";
 import { getLevel } from "@/lib/content";
+import { sceneFor } from "@/lib/scenes";
 
 const SAVE_KEY = "shq-login";
 
@@ -266,23 +267,25 @@ export default function Game() {
               );
             })}
           </div>
-          <p style={{ fontSize: 12.5, color: "#8a8694", marginTop: 14, textShadow: "0 1px 6px #000" }}>★★ 以上算通過。點已通過的關卡可重玩複習，成績取最佳。</p>
+          <p style={{ fontSize: 12.5, color: "var(--gold)", marginTop: 14, letterSpacing: 1, textShadow: "0 1px 6px #000" }}>1 序幕｜2–5 校園｜6–9 家裡｜10–12 深夜與同儕｜13 神器之間｜14 風暴將至｜15 決戰古神</p>
+          <p style={{ fontSize: 12.5, color: "#8a8694", marginTop: 6, textShadow: "0 1px 6px #000" }}>★★ 以上算通過。點已通過的關卡可重玩複習，成績取最佳。</p>
         </div>
       </>
     );
   }
 
   if (phase === "play") {
+    const stageScene = sceneFor(habitN, levelN, player?.gender);
     if (sceneIdx === -1) {
       return (
         <>
-          <Stage img={`/layers/${habitN}.jpg`} dark={level.type !== "boss"} />
+          <Stage img={stageScene.img} dark={level.type !== "boss"} />
           <div className="wrap center" style={{ "--accent": habit.color, cursor: "pointer" }} onClick={nextScene}>
             <div className="topbar" style={{ position: "absolute", top: 18, left: 18, right: 18 }} onClick={(e) => e.stopPropagation()}>
               <button onClick={() => setPhase("levels")}>← 放棄這次挑戰</button>
               <span>{habit.name}・第 {levelN} 關</span>
             </div>
-            <p className="title-en" style={{ color: habit.color }}>{level.type === "boss" ? "Boss Battle" : `Level ${levelN}`}</p>
+            <p className="title-en" style={{ color: habit.color }}>{stageScene.act}</p>
             <h3 style={{ color: habit.color, textAlign: "center", fontSize: 26, letterSpacing: 4, margin: "6px 0 18px", textShadow: "0 2px 16px #000" }}>{level.title}</h3>
             <p className="narration">{level.intro}</p>
             <p className="tap-hint">點 擊 繼 續</p>
@@ -294,7 +297,7 @@ export default function Game() {
     const choice = picked !== null ? scene.choices[picked] : null;
     return (
       <>
-        <Stage img={`/layers/${habitN}.jpg`} dark />
+        <Stage img={stageScene.img} dark />
         <div className="wrap" style={{ "--accent": habit.color }}>
           <div className="topbar">
             <button onClick={() => setPhase("levels")}>← 放棄</button>
@@ -335,9 +338,10 @@ export default function Game() {
   if (phase === "result") {
     const passed = resultStars >= PASS_STARS;
     const hasNext = levelN < LEVELS_PER_HABIT;
+    const resultScene = sceneFor(habitN, levelN, player?.gender);
     return (
       <>
-        <Stage img={`/layers/${habitN}.jpg`} dark={!passed} />
+        <Stage img={resultScene.img} dark={!passed} />
         <div className="wrap center" style={{ "--accent": habit.color }}>
           <p className="title-en" style={{ color: habit.color }}>{passed ? "Victory" : "Try Again"}</p>
           <h3 style={{ color: habit.color, textAlign: "center", fontSize: 24, letterSpacing: 4, textShadow: "0 2px 14px #000" }}>{level.title}</h3>
