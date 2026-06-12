@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CLASSES, MAX_SEAT, HABITS, LEVELS_PER_HABIT, PASS_STARS, calcStars } from "@/lib/config";
 import { getLevel } from "@/lib/content";
 import { sceneFor } from "@/lib/scenes";
@@ -16,6 +16,19 @@ function Stage({ img, fallback, dark = false }) {
 export default function Game() {
   const [phase, setPhase] = useState("login"); // login | map | levels | play | result
   const [entered, setEntered] = useState(false); // 首頁敘事 → 報名
+  const [introDone, setIntroDone] = useState(false); // 開場影片
+  const [soundOn, setSoundOn] = useState(false);
+  const videoRef = useRef(null);
+
+  // 影片 4 秒內沒播起來（網路慢／載入失敗）就直接進首頁，不卡學生
+  useEffect(() => {
+    if (introDone) return;
+    const t = setTimeout(() => {
+      const v = videoRef.current;
+      if (!v || v.currentTime < 0.2) setIntroDone(true);
+    }, 4000);
+    return () => clearTimeout(t);
+  }, [introDone]);
   const [player, setPlayer] = useState(null);
   const [form, setForm] = useState({ cls: "", seat: "", name: "", gender: "" });
   const [mismatchName, setMismatchName] = useState(null);
@@ -128,6 +141,29 @@ export default function Game() {
   // ====================== 畫面 ======================
 
   if (phase === "login") {
+    if (!introDone) {
+      return (
+        <div className="intro-video-wrap">
+          <video
+            ref={videoRef}
+            className="intro-video"
+            src="/intro.mp4"
+            autoPlay
+            muted
+            playsInline
+            onEnded={() => setIntroDone(true)}
+            onError={() => setIntroDone(true)}
+          />
+          <div className="intro-actions">
+            <button className="intro-btn" onClick={() => {
+              const v = videoRef.current;
+              if (v) { v.muted = soundOn; setSoundOn(!soundOn); }
+            }}>{soundOn ? "🔇 關聲音" : "🔊 開聲音"}</button>
+            <button className="intro-btn" onClick={() => setIntroDone(true)}>跳過 ▸</button>
+          </div>
+        </div>
+      );
+    }
     if (!entered) {
       return (
         <>

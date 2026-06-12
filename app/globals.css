@@ -171,6 +171,25 @@ label { display: block; font-size: 13px; color: var(--gold); letter-spacing: 3px
   text-shadow: 0 1px 8px rgba(0, 0, 0, 0.8);
 }
 
+/* ---------- 首頁開場影片 ---------- */
+.intro-video-wrap { position: fixed; inset: 0; background: #000; z-index: 50; }
+.intro-video { width: 100%; height: 100%; object-fit: cover; }
+.intro-actions { position: absolute; top: 18px; right: 18px; display: flex; gap: 10px; }
+.intro-btn {
+  background: rgba(10, 11, 16, 0.55);
+  border: 1px solid var(--line);
+  color: var(--text);
+  border-radius: 4px;
+  padding: 8px 16px;
+  letter-spacing: 3px;
+  font-family: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.intro-btn:hover { border-color: var(--gold); color: var(--gold); }
+
 /* ---------- 遊戲對話版面（底部融入畫面） ---------- */
 .play-col {
   display: flex;
