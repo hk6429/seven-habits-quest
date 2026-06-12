@@ -6,6 +6,7 @@ import { getLevel } from "@/lib/content";
 import { sceneFor } from "@/lib/scenes";
 
 const SAVE_KEY = "shq-login";
+const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
 
 function Stage({ img, fallback, dark = false }) {
   // CSS 多層背景：第一層圖載入失敗時透出第二層（每關圖未生成前退回幕場景）
@@ -19,6 +20,10 @@ export default function Game() {
   const [introDone, setIntroDone] = useState(false); // 開場影片
   const [soundOn, setSoundOn] = useState(false);
   const videoRef = useRef(null);
+
+  const [googleCred, setGoogleCred] = useState(null); // Google ID token（首次綁定用）
+  const [setupNeeded, setSetupNeeded] = useState(false); // Google 登入後的班級座號設定
+  const [guestPick, setGuestPick] = useState(false); // 訪客選主角中
 
   // 影片 4 秒內沒播起來（網路慢／載入失敗）就直接進首頁，不卡學生
   useEffect(() => {
@@ -69,7 +74,84 @@ export default function Game() {
     return l === 1 || starsOf(h, l - 1) >= PASS_STARS;
   }
 
-  // ---------- 登入 ----------
+  // ---------- Google 登入 ----------
+  async function onGoogleCredential(resp) {
+    setErr("");
+    setBusy(true);
+    try {
+      const res = await fetch("/api/google", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ credential: resp.credential }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setErr(data.error || "Google 登入失敗，再試一次"); return; }
+      if (data.needSetup) {
+        setGoogleCred(resp.credential);
+        setForm((f) => ({ ...f, name: (data.profile?.name || "").slice(0, 12) }));
+        setSetupNeeded(true);
+        return;
+      }
+      setPlayer(data.record);
+      setPhase("map");
+    } catch {
+      setErr("連線失敗，確認網路後再試一次");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function bindGoogle(confirmExisting = false) {
+    setErr("");
+    setBusy(true);
+    try {
+      const res = await fetch("/api/google", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ credential: googleCred, ...form, confirmExisting }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setErr(data.error || "綁定失敗，再試一次"); return; }
+      if (data.mismatch) { setMismatchName(data.existingName); return; }
+      setMismatchName(null);
+      setPlayer(data.record);
+      setPhase("map");
+    } catch {
+      setErr("連線失敗，確認網路後再試一次");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // 載入 Google Sign-In 按鈕
+  useEffect(() => {
+    if (!GOOGLE_CLIENT_ID || phase !== "login" || !entered || setupNeeded) return;
+    let cancelled = false;
+    const render = () => {
+      if (cancelled) return;
+      const el = document.getElementById("gsi-btn");
+      if (!el || !window.google?.accounts?.id) return;
+      window.google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: onGoogleCredential });
+      window.google.accounts.id.renderButton(el, { theme: "filled_black", size: "large", text: "signin_with", locale: "zh_TW", width: 280 });
+    };
+    if (window.google?.accounts?.id) { render(); return; }
+    const s = document.createElement("script");
+    s.src = "https://accounts.google.com/gsi/client";
+    s.async = true;
+    s.onload = render;
+    document.head.appendChild(s);
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, entered, setupNeeded]);
+
+  // ---------- 訪客 ----------
+  function startGuest(g) {
+    setPlayer({ guest: true, cls: "試玩", seat: "—", name: "訪客", gender: g, levels: {} });
+    setGuestPick(false);
+    setPhase("map");
+  }
+
+  // ---------- 登入（無 Google 設定時的備援） ----------
   async function login(confirmExisting = false) {
     setErr("");
     setBusy(true);
@@ -96,6 +178,10 @@ export default function Game() {
   function logout() {
     setPlayer(null);
     setEntered(false);
+    setSetupNeeded(false);
+    setGoogleCred(null);
+    setGuestPick(false);
+    setMismatchName(null);
     setPhase("login");
   }
 
@@ -125,11 +211,18 @@ export default function Game() {
     const stars = calcStars(finalEarned, lv.scenes.length * 2);
     setResultStars(stars);
     setPhase("result");
+    const key = `${habitN}-${levelN}`;
+    if (player?.guest) {
+      // 試玩模式：進度只留在這次瀏覽，不上傳
+      const prev = player.levels[key] || { stars: 0, attempts: 0 };
+      setPlayer({ ...player, levels: { ...player.levels, [key]: { stars: Math.max(prev.stars, stars), attempts: prev.attempts + 1 } } });
+      return;
+    }
     try {
       const res = await fetch("/api/level", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cls: player.cls, seat: player.seat, levelId: `${habitN}-${levelN}`, stars }),
+        body: JSON.stringify({ cls: player.cls, seat: player.seat, levelId: key, stars }),
       });
       const data = await res.json();
       if (res.ok) setPlayer(data.record);
@@ -184,49 +277,83 @@ export default function Game() {
         </>
       );
     }
+    const setupForm = (
+      <div className="card">
+        <label>班級</label>
+        <select value={form.cls} onChange={(e) => setForm({ ...form, cls: e.target.value })}>
+          <option value="">請選擇班級</option>
+          {CLASSES.map((c) => <option key={c} value={c}>{c.slice(0, 1)} 年 {parseInt(c.slice(1), 10)} 班</option>)}
+        </select>
+        <label>座號</label>
+        <select value={form.seat} onChange={(e) => setForm({ ...form, seat: e.target.value })}>
+          <option value="">請選擇座號</option>
+          {Array.from({ length: MAX_SEAT }, (_, i) => i + 1).map((s) => <option key={s} value={s}>{s} 號</option>)}
+        </select>
+        <label>姓名</label>
+        <input value={form.name} maxLength={12} placeholder="請輸入真實姓名" onChange={(e) => setForm({ ...form, name: e.target.value })} />
+        <label>我是</label>
+        <div style={{ display: "flex", gap: 10 }}>
+          {[["M", "男生"], ["F", "女生"]].map(([v, t]) => (
+            <button key={v} className="btn" style={{ textAlign: "center", borderColor: form.gender === v ? "var(--gold)" : undefined, background: form.gender === v ? "rgba(216,178,74,.25)" : undefined, marginTop: 0 }} onClick={() => setForm({ ...form, gender: v })}>{t}</button>
+          ))}
+        </div>
+        <div style={{ marginTop: 24 }}>
+          <button className="btn primary" disabled={busy || !form.cls || !form.seat || !form.name.trim() || !form.gender} onClick={() => (setupNeeded ? bindGoogle(false) : login(false))}>
+            {busy ? "進 入 中" : "領 取 長 劍"}
+          </button>
+        </div>
+        {err && <p className="err">{err}</p>}
+      </div>
+    );
+
     return (
       <>
         <Stage img="/layers/0.jpg" dark />
         <div className="wrap center">
-          <p className="narration" style={{ marginBottom: 26 }}>深淵的入口浮現了一行字——{"\n"}「報上名來，領取你的選擇之劍。」</p>
-
           {mismatchName ? (
-            <div className="card">
-              <p className="scene-text">這個座號已經有「<b>{mismatchName}</b>」的冒險紀錄，但你輸入的名字是「{form.name}」。</p>
-              <div style={{ marginTop: 16 }}>
-                <button className="btn primary" onClick={() => setMismatchName(null)}>我填錯了，回去修改</button>
-                <button className="btn ghost" onClick={() => login(true)} disabled={busy}>我就是 {mismatchName}，繼續那份進度</button>
+            <>
+              <p className="narration" style={{ marginBottom: 26 }}>深淵認得這個座位⋯⋯</p>
+              <div className="card">
+                <p className="scene-text">這個座號已經有「<b>{mismatchName}</b>」的冒險紀錄，但你輸入的名字是「{form.name}」。</p>
+                <div style={{ marginTop: 16 }}>
+                  <button className="btn primary" onClick={() => setMismatchName(null)}>我填錯了，回去修改</button>
+                  <button className="btn ghost" onClick={() => (setupNeeded ? bindGoogle(true) : login(true))} disabled={busy}>我就是 {mismatchName}，繼續那份進度</button>
+                </div>
               </div>
-            </div>
+            </>
+          ) : setupNeeded ? (
+            <>
+              <p className="narration" style={{ marginBottom: 26 }}>劍認得你了。{"\n"}最後一步——告訴深淵，你是哪個教室來的。</p>
+              {setupForm}
+            </>
+          ) : guestPick ? (
+            <>
+              <p className="narration" style={{ marginBottom: 26 }}>試玩模式——選擇你的主角。{"\n"}（進度不會保存）</p>
+              <div className="card">
+                <div style={{ display: "flex", gap: 10 }}>
+                  {[["M", "男生"], ["F", "女生"]].map(([v, t]) => (
+                    <button key={v} className="btn" style={{ textAlign: "center", marginTop: 0 }} onClick={() => startGuest(v)}>{t}</button>
+                  ))}
+                </div>
+                <button className="btn ghost" style={{ marginTop: 14 }} onClick={() => setGuestPick(false)}>← 返回</button>
+              </div>
+            </>
           ) : (
-            <div className="card">
-              <label>班級</label>
-              <select value={form.cls} onChange={(e) => setForm({ ...form, cls: e.target.value })}>
-                <option value="">請選擇班級</option>
-                {CLASSES.map((c) => <option key={c} value={c}>{c.slice(0, 1)} 年 {parseInt(c.slice(1), 10)} 班</option>)}
-              </select>
-              <label>座號</label>
-              <select value={form.seat} onChange={(e) => setForm({ ...form, seat: e.target.value })}>
-                <option value="">請選擇座號</option>
-                {Array.from({ length: MAX_SEAT }, (_, i) => i + 1).map((s) => <option key={s} value={s}>{s} 號</option>)}
-              </select>
-              <label>姓名</label>
-              <input value={form.name} maxLength={12} placeholder="請輸入真實姓名" onChange={(e) => setForm({ ...form, name: e.target.value })} />
-              <label>我是</label>
-              <div style={{ display: "flex", gap: 10 }}>
-                {[["M", "男生"], ["F", "女生"]].map(([v, t]) => (
-                  <button key={v} className="btn" style={{ textAlign: "center", borderColor: form.gender === v ? "var(--gold)" : undefined, background: form.gender === v ? "rgba(216,178,74,.25)" : undefined, marginTop: 0 }} onClick={() => setForm({ ...form, gender: v })}>{t}</button>
-                ))}
-              </div>
-              <div style={{ marginTop: 24 }}>
-                <button className="btn primary" disabled={busy || !form.cls || !form.seat || !form.name.trim() || !form.gender} onClick={() => login(false)}>
-                  {busy ? "進 入 中" : "領 取 長 劍"}
-                </button>
-              </div>
-              {err && <p className="err">{err}</p>}
-            </div>
+            <>
+              <p className="narration" style={{ marginBottom: 26 }}>深淵的入口浮現了一行字——{"\n"}「報上名來，領取你的選擇之劍。」</p>
+              {GOOGLE_CLIENT_ID ? (
+                <div className="card" style={{ textAlign: "center" }}>
+                  <label style={{ marginTop: 0 }}>學生登入（紀錄會保存）</label>
+                  <div id="gsi-btn" style={{ display: "flex", justifyContent: "center", minHeight: 44, marginTop: 6 }} />
+                  {err && <p className="err">{err}</p>}
+                </div>
+              ) : (
+                setupForm
+              )}
+              <button className="btn ghost" onClick={() => setGuestPick(true)}>訪 客 試 玩（不留紀錄）</button>
+            </>
           )}
-          <button className="btn ghost" style={{ width: "auto", minWidth: 160, margin: "4px auto 0" }} onClick={() => setEntered(false)}>← 回到深淵入口</button>
+          <button className="btn ghost" style={{ width: "auto", minWidth: 160, margin: "10px auto 0" }} onClick={() => { setEntered(false); setSetupNeeded(false); setGuestPick(false); setMismatchName(null); }}>← 回到深淵入口</button>
         </div>
       </>
     );
@@ -240,7 +367,7 @@ export default function Game() {
         <Stage img="/layers/0.jpg" dark />
         <div className="wrap">
           <div className="topbar">
-            <span>⚔️ {hero}・{player.name}（{player.cls} 班 {player.seat} 號）</span>
+            <span>{player.guest ? "⚔️ 試玩模式・進度不會保存" : `⚔️ ${hero}・${player.name}（${player.cls} 班 ${player.seat} 號）`}</span>
             <button onClick={logout}>離開</button>
           </div>
           <p className="title-en">The Seven Layers</p>
