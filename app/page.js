@@ -185,7 +185,13 @@ export default function Game() {
           const unlocked = habitUnlocked(h.n);
           const pc = passedCount(h.n);
           return (
-            <div key={h.n} className={`habit-row${unlocked ? "" : " locked"}`} style={{ "--accent": h.color }}
+            <div key={h.n} className={`habit-row${unlocked ? "" : " locked"}`}
+              style={{
+                "--accent": h.color,
+                backgroundImage: unlocked
+                  ? `linear-gradient(90deg, rgba(13,15,20,.93) 38%, rgba(13,15,20,.62)), url(/layers/${h.n}.jpg)`
+                  : undefined,
+              }}
               onClick={() => { if (unlocked) { setHabitN(h.n); setPhase("levels"); } }}>
               <div className="habit-num">{unlocked ? h.n : "🔒"}</div>
               <div className="habit-info">
@@ -211,6 +217,7 @@ export default function Game() {
           <button onClick={() => setPhase("map")}>← 回深淵地圖</button>
           <span>{pc} / {LEVELS_PER_HABIT}</span>
         </div>
+        <div className="layer-hero"><img src={`/layers/${habitN}.jpg`} alt={habit.god} /></div>
         <h2 style={{ color: habit.color }}>{habit.god}</h2>
         <h3 style={{ margin: "2px 0 8px" }}>習慣{["一", "二", "三", "四", "五", "六", "七"][habitN - 1]}・{habit.name}</h3>
         <p style={{ color: "var(--dim)", fontSize: 14.5 }}>{habit.godIntro}</p>
@@ -243,6 +250,7 @@ export default function Game() {
             <button onClick={() => setPhase("levels")}>← 放棄這次挑戰</button>
             <span>{habit.name}・第 {levelN} 關</span>
           </div>
+          {level.type === "boss" && <div className="layer-hero"><img src={`/layers/${habitN}.jpg`} alt={habit.god} /></div>}
           <div className="card">
             <h3 style={{ color: habit.color, marginBottom: 8 }}>{level.title}</h3>
             <p className="scene-text">{level.intro}</p>

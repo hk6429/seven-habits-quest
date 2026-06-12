@@ -99,6 +99,8 @@ label { display: block; font-size: 13px; color: var(--dim); margin: 14px 0 6px; 
   padding: 14px 16px;
   border-radius: 14px;
   background: var(--panel);
+  background-size: cover;
+  background-position: center 30%;
   border: 1px solid #262c3a;
   margin-bottom: 10px;
   cursor: pointer;
@@ -117,6 +119,20 @@ label { display: block; font-size: 13px; color: var(--dim); margin: 14px 0 6px; 
 .habit-info .nm { font-weight: 700; }
 .habit-info .gd { font-size: 12.5px; color: var(--dim); }
 .habit-prog { font-size: 13px; color: var(--dim); flex: none; }
+
+.layer-hero {
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid #262c3a;
+  margin-bottom: 14px;
+  position: relative;
+}
+.layer-hero img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; }
+.layer-hero::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(13,15,20,0) 50%, rgba(13,15,20,.88) 100%);
+}
 
 .level-grid {
   display: grid;
