@@ -24,6 +24,7 @@ export default function Game() {
   const [googleCred, setGoogleCred] = useState(null); // Google ID token（首次綁定用）
   const [setupNeeded, setSetupNeeded] = useState(false); // Google 登入後的班級座號設定
   const [guestPick, setGuestPick] = useState(false); // 訪客選主角中
+  const [studentMode, setStudentMode] = useState(false); // 學生入口
 
   // 影片 4 秒內沒播起來（網路慢／載入失敗）就直接進首頁，不卡學生
   useEffect(() => {
@@ -126,7 +127,7 @@ export default function Game() {
 
   // 載入 Google Sign-In 按鈕
   useEffect(() => {
-    if (!GOOGLE_CLIENT_ID || phase !== "login" || !entered || setupNeeded) return;
+    if (!GOOGLE_CLIENT_ID || phase !== "login" || !entered || !studentMode || setupNeeded) return;
     let cancelled = false;
     const render = () => {
       if (cancelled) return;
@@ -143,7 +144,7 @@ export default function Game() {
     document.head.appendChild(s);
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, entered, setupNeeded]);
+  }, [phase, entered, studentMode, setupNeeded]);
 
   // ---------- 訪客 ----------
   function startGuest(g) {
@@ -182,6 +183,7 @@ export default function Game() {
     setSetupNeeded(false);
     setGoogleCred(null);
     setGuestPick(false);
+    setStudentMode(false);
     setMismatchName(null);
     setPhase("login");
   }
@@ -341,22 +343,29 @@ export default function Game() {
                 <button className="btn ghost" style={{ marginTop: 14 }} onClick={() => setGuestPick(false)}>← 返回</button>
               </div>
             </>
-          ) : (
+          ) : studentMode ? (
             <>
               <p className="narration" style={{ marginBottom: 26 }}>深淵的入口浮現了一行字——{"\n"}「報上名來，領取你的選擇之劍。」</p>
               {GOOGLE_CLIENT_ID ? (
                 <div className="card" style={{ textAlign: "center" }}>
-                  <label style={{ marginTop: 0 }}>學生登入（紀錄會保存）</label>
+                  <label style={{ marginTop: 0 }}>用 Google 帳號登入（紀錄會保存）</label>
                   <div id="gsi-btn" style={{ display: "flex", justifyContent: "center", minHeight: 44, marginTop: 6 }} />
                   {err && <p className="err">{err}</p>}
                 </div>
               ) : (
                 setupForm
               )}
-              <button className="btn ghost" onClick={() => setGuestPick(true)}>訪 客 試 玩（不留紀錄）</button>
+            </>
+          ) : (
+            <>
+              <p className="narration" style={{ marginBottom: 30 }}>深淵之前，有兩條路——</p>
+              <button className="btn primary" style={{ minWidth: 280 }} onClick={() => setStudentMode(true)}>⚔️ 學 生 登 入</button>
+              <p style={{ textAlign: "center", fontSize: 12.5, color: "var(--dim)", margin: "6px 0 14px", textShadow: "0 1px 6px #000" }}>闖關紀錄會保存，老師看得到你的進度</p>
+              <button className="btn ghost" style={{ width: "auto", minWidth: 280, margin: "0 auto" }} onClick={() => setGuestPick(true)}>👤 訪 客 試 玩</button>
+              <p style={{ textAlign: "center", fontSize: 12.5, color: "var(--dim)", marginTop: 6, textShadow: "0 1px 6px #000" }}>不留任何紀錄，純體驗</p>
             </>
           )}
-          <button className="btn ghost" style={{ width: "auto", minWidth: 160, margin: "10px auto 0" }} onClick={() => { setEntered(false); setSetupNeeded(false); setGuestPick(false); setMismatchName(null); }}>← 回到深淵入口</button>
+          <button className="btn ghost" style={{ width: "auto", minWidth: 160, margin: "16px auto 0" }} onClick={() => { if (studentMode || guestPick || setupNeeded) { setStudentMode(false); setGuestPick(false); setSetupNeeded(false); setMismatchName(null); } else { setEntered(false); } }}>← 返 回</button>
         </div>
       </>
     );
