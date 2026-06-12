@@ -7,8 +7,10 @@ import { sceneFor } from "@/lib/scenes";
 
 const SAVE_KEY = "shq-login";
 
-function Stage({ img, dark = false }) {
-  return <div className={`stage-bg${dark ? " dark" : ""}`} style={{ backgroundImage: `url(${img})` }} />;
+function Stage({ img, fallback, dark = false }) {
+  // CSS 多層背景：第一層圖載入失敗時透出第二層（每關圖未生成前退回幕場景）
+  const bg = fallback ? `url(${img}), url(${fallback})` : `url(${img})`;
+  return <div className={`stage-bg${dark ? " dark" : ""}`} style={{ backgroundImage: bg }} />;
 }
 
 export default function Game() {
@@ -279,7 +281,7 @@ export default function Game() {
     if (sceneIdx === -1) {
       return (
         <>
-          <Stage img={stageScene.img} />
+          <Stage img={stageScene.img} fallback={stageScene.fallback} />
           <div className="play-col" style={{ "--accent": habit.color, cursor: "pointer" }} onClick={nextScene}>
             <div className="topbar" onClick={(e) => e.stopPropagation()}>
               <button onClick={() => setPhase("levels")}>← 放棄這次挑戰</button>
@@ -303,7 +305,7 @@ export default function Game() {
     const choice = picked !== null ? scene.choices[picked] : null;
     return (
       <>
-        <Stage img={stageScene.img} />
+        <Stage img={stageScene.img} fallback={stageScene.fallback} />
         <div className="play-col" style={{ "--accent": habit.color }}>
           <div className="topbar" style={{ marginBottom: 8 }}>
             <button onClick={() => setPhase("levels")}>← 放棄</button>
@@ -357,7 +359,7 @@ export default function Game() {
     const resultScene = sceneFor(habitN, levelN, player?.gender);
     return (
       <>
-        <Stage img={resultScene.img} dark={!passed} />
+        <Stage img={resultScene.img} fallback={resultScene.fallback} dark={!passed} />
         <div className="wrap center" style={{ "--accent": habit.color }}>
           <p className="title-en" style={{ color: habit.color }}>{passed ? "Victory" : "Try Again"}</p>
           <h3 style={{ color: habit.color, textAlign: "center", fontSize: 24, letterSpacing: 4, textShadow: "0 2px 14px #000" }}>{level.title}</h3>
