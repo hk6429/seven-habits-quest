@@ -45,6 +45,7 @@ export default function Game() {
   const [sceneIdx, setSceneIdx] = useState(-1); // -1 = intro 畫面
   const [picked, setPicked] = useState(null);
   const [earned, setEarned] = useState(0);
+  const [picksRun, setPicksRun] = useState([]); // 本次闖關的選擇歷程
   const [resultStars, setResultStars] = useState(0);
 
   useEffect(() => {
@@ -188,14 +189,16 @@ export default function Game() {
   // ---------- 闖關 ----------
   function startLevel(h, l) {
     setHabitN(h); setLevelN(l);
-    setSceneIdx(-1); setPicked(null); setEarned(0);
+    setSceneIdx(-1); setPicked(null); setEarned(0); setPicksRun([]);
     setPhase("play");
   }
 
   function pick(i) {
     if (picked !== null) return;
     setPicked(i);
-    setEarned((e) => e + getLevel(habitN, levelN).scenes[sceneIdx].choices[i].q);
+    const q = getLevel(habitN, levelN).scenes[sceneIdx].choices[i].q;
+    setEarned((e) => e + q);
+    setPicksRun((p) => [...p, { s: sceneIdx, c: i, q }]);
   }
 
   async function nextScene() {
@@ -222,7 +225,7 @@ export default function Game() {
       const res = await fetch("/api/level", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cls: player.cls, seat: player.seat, levelId: key, stars }),
+        body: JSON.stringify({ cls: player.cls, seat: player.seat, levelId: key, stars, picks: picksRun }),
       });
       const data = await res.json();
       if (res.ok) setPlayer(data.record);
