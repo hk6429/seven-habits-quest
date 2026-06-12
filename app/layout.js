@@ -1,4 +1,7 @@
+import { Noto_Serif_TC } from "next/font/google";
 import "./globals.css";
+
+const serif = Noto_Serif_TC({ weight: ["400", "600", "900"], subsets: ["latin"], display: "swap" });
 
 export const metadata = {
   title: "心之深淵：選擇之劍｜七個習慣闖關",
@@ -14,7 +17,7 @@ export const viewport = {
 export default function RootLayout({ children }) {
   return (
     <html lang="zh-Hant-TW">
-      <body>{children}</body>
+      <body className={serif.className}>{children}</body>
     </html>
   );
 }
