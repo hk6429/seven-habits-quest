@@ -171,6 +171,46 @@ label { display: block; font-size: 13px; color: var(--gold); letter-spacing: 3px
   text-shadow: 0 1px 8px rgba(0, 0, 0, 0.8);
 }
 
+/* ---------- 遊戲對話版面（底部融入畫面） ---------- */
+.play-col {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 18px 18px 28px;
+}
+.play-col .spacer { flex: 1; }
+.dialog-area { width: 100%; max-width: 700px; margin: 0 auto; }
+.dialog-box {
+  background: rgba(10, 11, 16, 0.78);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin-top: 10px;
+}
+.dialog-box .who {
+  color: var(--gold);
+  font-size: 12.5px;
+  letter-spacing: 4px;
+  display: block;
+  margin-bottom: 6px;
+}
+.dialog-box .who.sword { color: var(--accent); }
+.dlg-text { font-size: 17px; white-space: pre-wrap; line-height: 1.9; }
+.dlg-echo {
+  font-size: 14.5px;
+  color: var(--dim);
+  background: rgba(10, 11, 16, 0.55);
+  border: 1px solid rgba(168, 164, 176, 0.18);
+  border-radius: 8px;
+  padding: 10px 16px;
+  margin-top: 10px;
+}
+
 /* ---------- 劍靈對話框 ---------- */
 .feedback {
   border: 1px solid var(--line);

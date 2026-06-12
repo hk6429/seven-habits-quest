@@ -279,16 +279,22 @@ export default function Game() {
     if (sceneIdx === -1) {
       return (
         <>
-          <Stage img={stageScene.img} dark={level.type !== "boss"} />
-          <div className="wrap center" style={{ "--accent": habit.color, cursor: "pointer" }} onClick={nextScene}>
-            <div className="topbar" style={{ position: "absolute", top: 18, left: 18, right: 18 }} onClick={(e) => e.stopPropagation()}>
+          <Stage img={stageScene.img} />
+          <div className="play-col" style={{ "--accent": habit.color, cursor: "pointer" }} onClick={nextScene}>
+            <div className="topbar" onClick={(e) => e.stopPropagation()}>
               <button onClick={() => setPhase("levels")}>← 放棄這次挑戰</button>
               <span>{habit.name}・第 {levelN} 關</span>
             </div>
-            <p className="title-en" style={{ color: habit.color }}>{stageScene.act}</p>
-            <h3 style={{ color: habit.color, textAlign: "center", fontSize: 26, letterSpacing: 4, margin: "6px 0 18px", textShadow: "0 2px 16px #000" }}>{level.title}</h3>
-            <p className="narration">{level.intro}</p>
-            <p className="tap-hint">點 擊 繼 續</p>
+            <div className="spacer" style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
+              <p className="title-en" style={{ color: habit.color }}>{stageScene.act}</p>
+              <h3 style={{ color: habit.color, textAlign: "center", fontSize: 26, letterSpacing: 4, margin: "6px 0", textShadow: "0 2px 16px #000" }}>{level.title}</h3>
+            </div>
+            <div className="dialog-area">
+              <div className="dialog-box">
+                <p className="dlg-text">{level.intro}</p>
+              </div>
+              <p className="tap-hint" style={{ marginTop: 16 }}>點 擊 繼 續</p>
+            </div>
           </div>
         </>
       );
@@ -297,39 +303,49 @@ export default function Game() {
     const choice = picked !== null ? scene.choices[picked] : null;
     return (
       <>
-        <Stage img={stageScene.img} dark />
-        <div className="wrap" style={{ "--accent": habit.color }}>
-          <div className="topbar">
+        <Stage img={stageScene.img} />
+        <div className="play-col" style={{ "--accent": habit.color }}>
+          <div className="topbar" style={{ marginBottom: 8 }}>
             <button onClick={() => setPhase("levels")}>← 放棄</button>
             <span>{level.title}　{sceneIdx + 1} / {level.scenes.length}</span>
+            <span className="sword-energy" style={{ marginBottom: 0 }}>⚡ {earned} / {maxPts}</span>
           </div>
-          <div className="progress-track"><div className="progress-fill" style={{ width: `${((sceneIdx) / level.scenes.length) * 100}%` }} /></div>
-          <div className="sword-energy">⚡ 劍能 {earned} / {maxPts}</div>
-          <div style={{ minHeight: "16vh", display: "flex", alignItems: "center", padding: "10px 0 22px" }}>
-            <p className="narration left" style={{ fontSize: 17.5 }}>{scene.text}</p>
+          <div className="progress-track" style={{ margin: "0 0 8px" }}><div className="progress-fill" style={{ width: `${((sceneIdx) / level.scenes.length) * 100}%` }} /></div>
+          <div className="spacer" />
+          <div className="dialog-area">
+            {!choice ? (
+              <>
+                <div className="dialog-box">
+                  <span className="who">{stageScene.act}</span>
+                  <p className="dlg-text">{scene.text}</p>
+                </div>
+                <div style={{ marginTop: 4 }}>
+                  {scene.choices.map((c, i) => (
+                    <button key={i} className="btn" style={{ background: "rgba(10,11,16,.62)", marginTop: 8 }} onClick={() => pick(i)}>
+                      {c.t}
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="dlg-echo">你的選擇：{choice.t}</div>
+                <div className="dialog-box" style={{ borderLeft: "3px solid var(--accent)" }}>
+                  <span className="who sword">🗡️ 劍 靈</span>
+                  <p className="dlg-text">
+                    {choice.fb}
+                    {choice.q === 2 && <span style={{ color: "var(--gold)" }}>　⚡+2</span>}
+                    {choice.q === 1 && <span style={{ color: "var(--dim)" }}>　⚡+1</span>}
+                  </p>
+                </div>
+                <div style={{ marginTop: 14 }}>
+                  <button className="btn primary" onClick={nextScene}>
+                    {sceneIdx + 1 < level.scenes.length ? "繼 續" : "結 算"}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
-          {scene.choices.map((c, i) => (
-            <button key={i} className="btn" disabled={picked !== null && picked !== i}
-              style={picked === i ? { borderColor: habit.color, background: "rgba(10,11,16,.78)" } : undefined}
-              onClick={() => pick(i)}>
-              {c.t}
-            </button>
-          ))}
-          {choice && (
-            <>
-              <div className="feedback">
-                <span className="who">🗡️ 劍靈</span>
-                {choice.fb}
-                {choice.q === 2 && <span style={{ color: "var(--gold)" }}>　⚡+2</span>}
-                {choice.q === 1 && <span style={{ color: "var(--dim)" }}>　⚡+1</span>}
-              </div>
-              <div style={{ marginTop: 16 }}>
-                <button className="btn primary" onClick={nextScene}>
-                  {sceneIdx + 1 < level.scenes.length ? "繼 續" : "結 算"}
-                </button>
-              </div>
-            </>
-          )}
         </div>
       </>
     );
