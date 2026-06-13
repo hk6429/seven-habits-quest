@@ -14,12 +14,89 @@ function Stage({ img, fallback, dark = false }) {
   return <div className={`stage-bg${dark ? " dark" : ""}`} style={{ backgroundImage: bg }} />;
 }
 
+// 完成證書：純 canvas 繪製（金色深淵風，含班級／座號／姓名，可下載）
+function drawCertificate(canvas, player) {
+  const W = 1600, H = 1131;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  const SERIF = '"Noto Serif TC","Songti TC","STSong",serif';
+  const GOLD = "#d8b24a", GOLD2 = "#f0d896", INK = "#e9e4d6";
+
+  // 背景
+  const bg = ctx.createLinearGradient(0, 0, W, H);
+  bg.addColorStop(0, "#0b0c12"); bg.addColorStop(0.5, "#14121c"); bg.addColorStop(1, "#0a0b10");
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+  // 中央暈光
+  const glow = ctx.createRadialGradient(W / 2, H * 0.42, 60, W / 2, H * 0.42, W * 0.6);
+  glow.addColorStop(0, "rgba(216,178,74,.10)"); glow.addColorStop(1, "rgba(216,178,74,0)");
+  ctx.fillStyle = glow; ctx.fillRect(0, 0, W, H);
+
+  // 金框（雙線＋四角）
+  ctx.strokeStyle = GOLD; ctx.lineWidth = 3; ctx.strokeRect(54, 54, W - 108, H - 108);
+  ctx.strokeStyle = "rgba(216,178,74,.5)"; ctx.lineWidth = 1.5; ctx.strokeRect(72, 72, W - 144, H - 144);
+  ctx.strokeStyle = GOLD; ctx.lineWidth = 3;
+  const corner = (x, y, dx, dy) => { ctx.beginPath(); ctx.moveTo(x, y + dy * 46); ctx.lineTo(x, y); ctx.lineTo(x + dx * 46, y); ctx.stroke(); };
+  corner(54, 54, 1, 1); corner(W - 54, 54, -1, 1); corner(54, H - 54, 1, -1); corner(W - 54, H - 54, -1, -1);
+
+  ctx.textAlign = "center";
+  // 上標
+  ctx.fillStyle = GOLD; ctx.font = `28px ${SERIF}`;
+  ctx.fillText("C E R T I F I C A T E   O F   C O M P L E T I O N", W / 2, 168);
+  // 主標
+  ctx.fillStyle = GOLD2; ctx.font = `bold 84px ${SERIF}`;
+  ctx.fillText("七個習慣 闖關完成證書", W / 2, 286);
+  ctx.fillStyle = INK; ctx.font = `34px ${SERIF}`;
+  ctx.fillText("心之深淵 ・ 選擇之劍", W / 2, 348);
+  // 分隔
+  ctx.strokeStyle = GOLD; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(W / 2 - 180, 388); ctx.lineTo(W / 2 + 180, 388); ctx.stroke();
+  ctx.fillStyle = GOLD; ctx.font = `26px ${SERIF}`; ctx.fillText("✦", W / 2, 396);
+
+  // 內文
+  ctx.fillStyle = INK; ctx.font = `36px ${SERIF}`;
+  ctx.fillText("茲 證 明", W / 2, 470);
+  // 班級座號姓名
+  const who = player.guest
+    ? `試玩者・${player.name || "訪客"}`
+    : `${player.cls} 班　${player.seat} 號　${player.name}`;
+  ctx.fillStyle = GOLD2; ctx.font = `bold 62px ${SERIF}`;
+  ctx.fillText(who, W / 2, 566);
+  // 底線
+  ctx.strokeStyle = "rgba(216,178,74,.55)"; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(W / 2 - 460, 596); ctx.lineTo(W / 2 + 460, 596); ctx.stroke();
+
+  ctx.fillStyle = INK; ctx.font = `33px ${SERIF}`;
+  ctx.fillText("已勇闖七層深淵、通過全部一百零五道試煉，", W / 2, 670);
+  ctx.fillText("斬破七尊壞習慣古神，習得「七個習慣」之道。", W / 2, 722);
+
+  // 七習慣橫排
+  ctx.fillStyle = GOLD; ctx.font = `30px ${SERIF}`;
+  const names = HABITS.map((h) => h.name);
+  ctx.fillText(names.join(" ・ "), W / 2, 814);
+
+  // 日期
+  const d = new Date();
+  const dstr = `${d.getFullYear()} 年 ${d.getMonth() + 1} 月 ${d.getDate()} 日`;
+  ctx.fillStyle = INK; ctx.font = `28px ${SERIF}`;
+  ctx.fillText(dstr, W / 2, 900);
+
+  // 印章
+  ctx.strokeStyle = GOLD; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.arc(W / 2, 1000, 56, 0, Math.PI * 2); ctx.stroke();
+  ctx.fillStyle = GOLD2; ctx.font = `bold 40px ${SERIF}`; ctx.fillText("斬", W / 2, 1014);
+
+  // 落款
+  ctx.fillStyle = GOLD; ctx.font = `26px ${SERIF}`;
+  ctx.fillText("竹光國中 ・ 自我領導力課程", W / 2, 1086);
+}
+
 export default function Game() {
   const [phase, setPhase] = useState("login"); // login | map | levels | play | result
   const [entered, setEntered] = useState(false); // 首頁敘事 → 報名
   const [introDone, setIntroDone] = useState(false); // 開場影片
   const [soundOn, setSoundOn] = useState(false);
   const videoRef = useRef(null);
+  const certRef = useRef(null);
 
   const [googleCred, setGoogleCred] = useState(null); // Google ID token（首次綁定用）
   const [setupNeeded, setSetupNeeded] = useState(false); // Google 登入後的班級座號設定
@@ -55,6 +132,26 @@ export default function Game() {
       if (saved) setForm((f) => ({ ...f, ...saved }));
     } catch {}
   }, []);
+
+  // 完成證書：進入 cert 畫面時繪製（等字型載入完再畫，避免中文變預設字型）
+  useEffect(() => {
+    if (phase !== "cert" || !player) return;
+    let cancelled = false;
+    const paint = () => { if (!cancelled && certRef.current) drawCertificate(certRef.current, player); };
+    if (document.fonts?.ready) document.fonts.ready.then(paint); else paint();
+    paint();
+    return () => { cancelled = true; };
+  }, [phase, player]);
+
+  function downloadCert() {
+    const c = certRef.current;
+    if (!c) return;
+    const a = document.createElement("a");
+    a.href = c.toDataURL("image/png");
+    const tag = player.guest ? "試玩" : `${player.cls}-${player.seat}-${player.name}`;
+    a.download = `七習慣完成證書_${tag}.png`;
+    a.click();
+  }
 
   const habit = HABITS[habitN - 1];
   const level = phase === "play" || phase === "result" ? getLevel(habitN, levelN) : null;
@@ -399,6 +496,13 @@ export default function Game() {
           <p className="title-en">The Seven Layers</p>
           <h2 style={{ textAlign: "center", letterSpacing: 8, textIndent: 8, fontSize: 26, textShadow: "0 2px 14px #000" }}>深淵地圖</h2>
           <p className="subtitle" style={{ marginTop: 4, marginBottom: 22 }}>已突破 {totalPassed} / {LEVELS_PER_HABIT * 7} 關</p>
+          {totalPassed === LEVELS_PER_HABIT * 7 && (
+            <div className="card" style={{ borderColor: "var(--gold)", textAlign: "center", marginBottom: 22 }}>
+              <p style={{ color: "var(--gold)", fontSize: 19, letterSpacing: 2, margin: 0 }}>🏆 七層深淵全數斬破！</p>
+              <p style={{ color: "#cfc9bd", fontSize: 13.5, margin: "8px 0 14px" }}>你已通過全部 105 道試煉，習得七個習慣。</p>
+              <button className="btn primary" style={{ width: "auto", minWidth: 240, margin: 0 }} onClick={() => setPhase("cert")}>領 取 完 成 證 書</button>
+            </div>
+          )}
           {HABITS.map((h) => {
             const unlocked = habitUnlocked(h.n);
             const pc = passedCount(h.n);
@@ -423,6 +527,28 @@ export default function Game() {
           <p style={{ fontSize: 12.5, color: "#8a8694", textAlign: "center", marginTop: 18, textShadow: "0 1px 6px #000", whiteSpace: "pre-wrap" }}>
             每一層 15 關全數通過（每關至少 ★★），才能下到下一層。{"\n"}已通過的關卡隨時可以重玩複習。
           </p>
+        </div>
+      </>
+    );
+  }
+
+  if (phase === "cert") {
+    return (
+      <>
+        <Stage img="/layers/0.jpg" dark />
+        <div className="wrap center" style={{ paddingTop: 30 }}>
+          <p className="title-en">Certificate of Completion</p>
+          <h2 style={{ textAlign: "center", letterSpacing: 6, fontSize: 24, margin: "6px 0 18px", textShadow: "0 2px 14px #000" }}>七個習慣 闖關完成證書</h2>
+          <canvas ref={certRef} style={{ width: "100%", maxWidth: 760, height: "auto", borderRadius: 10, boxShadow: "0 12px 50px rgba(0,0,0,.6)", border: "1px solid rgba(216,178,74,.35)" }} />
+          <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap", marginTop: 22 }}>
+            <button className="btn primary" style={{ width: "auto", minWidth: 200, margin: 0 }} onClick={downloadCert}>⬇ 下 載 證 書</button>
+            <button className="btn ghost" style={{ width: "auto", minWidth: 160, margin: 0 }} onClick={() => setPhase("map")}>← 回深淵地圖</button>
+          </div>
+          {player.guest && (
+            <p style={{ fontSize: 12.5, color: "#8a8694", textAlign: "center", marginTop: 16, textShadow: "0 1px 6px #000" }}>
+              試玩模式的證書不含班級座號；登入後完成才會印上你的資料。
+            </p>
+          )}
         </div>
       </>
     );
