@@ -500,7 +500,7 @@ export default function Game() {
             <div className="card" style={{ borderColor: "var(--gold)", textAlign: "center", marginBottom: 22 }}>
               <p style={{ color: "var(--gold)", fontSize: 19, letterSpacing: 2, margin: 0 }}>🏆 七層深淵全數斬破！</p>
               <p style={{ color: "#cfc9bd", fontSize: 13.5, margin: "8px 0 14px" }}>你已通過全部 105 道試煉，習得七個習慣。</p>
-              <button className="btn primary" style={{ width: "auto", minWidth: 240, margin: 0 }} onClick={() => setPhase("cert")}>領 取 完 成 證 書</button>
+              <button className="btn primary" style={{ width: "auto", minWidth: 240, margin: "0 auto" }} onClick={() => setPhase("cert")}>領 取 完 成 證 書</button>
             </div>
           )}
           {HABITS.map((h) => {
