@@ -72,22 +72,22 @@ function drawCertificate(canvas, player) {
   // 七習慣橫排
   ctx.fillStyle = GOLD; ctx.font = `30px ${SERIF}`;
   const names = HABITS.map((h) => h.name);
-  ctx.fillText(names.join(" ・ "), W / 2, 814);
+  ctx.fillText(names.join(" ・ "), W / 2, 800);
 
   // 日期
   const d = new Date();
   const dstr = `${d.getFullYear()} 年 ${d.getMonth() + 1} 月 ${d.getDate()} 日`;
   ctx.fillStyle = INK; ctx.font = `28px ${SERIF}`;
-  ctx.fillText(dstr, W / 2, 900);
+  ctx.fillText(dstr, W / 2, 872);
 
   // 印章
   ctx.strokeStyle = GOLD; ctx.lineWidth = 4;
-  ctx.beginPath(); ctx.arc(W / 2, 1000, 56, 0, Math.PI * 2); ctx.stroke();
-  ctx.fillStyle = GOLD2; ctx.font = `bold 40px ${SERIF}`; ctx.fillText("斬", W / 2, 1014);
+  ctx.beginPath(); ctx.arc(W / 2, 952, 44, 0, Math.PI * 2); ctx.stroke();
+  ctx.fillStyle = GOLD2; ctx.font = `bold 36px ${SERIF}`; ctx.fillText("斬", W / 2, 965);
 
   // 落款
   ctx.fillStyle = GOLD; ctx.font = `26px ${SERIF}`;
-  ctx.fillText("竹光國中 ・ 自我領導力課程", W / 2, 1086);
+  ctx.fillText("竹光國中 ・ 自我領導力課程", W / 2, 1034);
 }
 
 export default function Game() {
