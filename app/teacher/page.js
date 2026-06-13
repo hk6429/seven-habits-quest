@@ -3,9 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { HABITS, LEVELS_PER_HABIT, PASS_STARS } from "@/lib/config";
 import { CONTENT } from "@/lib/content";
+import { pointOf } from "@/lib/points";
 
 const TABS = [
   ["progress", "學生進度"],
+  ["detail", "個人知識點"],
   ["choices", "選擇歷程分析"],
   ["grades", "成績管理"],
   ["danger", "清除／換屆"],
@@ -34,6 +36,7 @@ export default function Teacher() {
   const [tab, setTab] = useState("progress");
 
   const [habitSel, setHabitSel] = useState(1);
+  const [detailSel, setDetailSel] = useState("");
 
   const [cohorts, setCohorts] = useState(null);
   const [cohortSel, setCohortSel] = useState("__current__");
@@ -282,6 +285,79 @@ export default function Teacher() {
           </div>
         </>
       )}
+
+      {/* ---------- 個人知識點 ---------- */}
+      {tab === "detail" && (() => {
+        const stu = shown.find((s) => `${s.cls}-${s.seat}` === detailSel);
+        const totalPassed = stu ? summarize(stu).passed : 0;
+        return (
+          <>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", margin: "10px 0" }}>
+              <h3 style={{ margin: 0 }}>個人知識點掌握</h3>
+              <select style={{ width: "auto", padding: "4px 8px", fontSize: 13 }} value={detailSel} onChange={(e) => setDetailSel(e.target.value)}>
+                <option value="">— 選擇學生 —</option>
+                {shown.map((s) => <option key={`${s.cls}-${s.seat}`} value={`${s.cls}-${s.seat}`}>{s.cls} 班 {s.seat} 號　{s.name}</option>)}
+              </select>
+            </div>
+
+            {!stu ? (
+              <p style={{ color: "var(--dim)" }}>選一位學生，看他逐關掌握了七個習慣的哪些知識點。每關 ★★ 以上＝已掌握該知識點，★★★＝精熟。</p>
+            ) : (
+              <>
+                <div className="card" style={{ borderLeft: "3px solid var(--gold)" }}>
+                  <b>{stu.cls} 班 {stu.seat} 號 {stu.name}</b>　已掌握知識點{" "}
+                  <b style={{ color: "var(--gold)" }}>{totalPassed} / {LEVELS_PER_HABIT * 7}</b>
+                  　|　完成的習慣{" "}
+                  <b style={{ color: "var(--gold)" }}>{summarize(stu).perHabit.filter((c) => c === LEVELS_PER_HABIT).length} / 7</b>
+                  <p style={{ color: "var(--dim)", fontSize: 12.5, marginTop: 6 }}>
+                    全部 105 關完成＝掌握七個習慣的全部 105 個核心知識點。
+                  </p>
+                </div>
+
+                {HABITS.map((h) => {
+                  let mastered = 0;
+                  for (let l = 1; l <= LEVELS_PER_HABIT; l++) {
+                    if ((stu.levels?.[`${h.n}-${l}`]?.stars ?? 0) >= PASS_STARS) mastered++;
+                  }
+                  return (
+                    <div key={h.n} style={{ marginTop: 14 }}>
+                      <h4 style={{ margin: "6px 0", color: h.color }}>
+                        第{["一", "二", "三", "四", "五", "六", "七"][h.n - 1]}層・{h.name}
+                        <span style={{ color: "var(--dim)", fontWeight: 400, fontSize: 13 }}>　已掌握 {mastered} / {LEVELS_PER_HABIT} 個知識點</span>
+                      </h4>
+                      <div className="scroll-x card" style={{ padding: 8 }}>
+                        <table className="matrix">
+                          <thead><tr><th>關</th><th>標題</th><th>知識點</th><th>星數</th><th>嘗試</th><th>到三星</th></tr></thead>
+                          <tbody>
+                            {Array.from({ length: LEVELS_PER_HABIT }, (_, i) => {
+                              const l = i + 1;
+                              const r = stu.levels?.[`${h.n}-${l}`];
+                              const stars = r?.stars ?? -1;
+                              const passed = stars >= PASS_STARS;
+                              const star = stars < 0 ? "—" : "★".repeat(stars) + "☆".repeat(3 - stars);
+                              const to3 = !r ? "—" : stars >= 3 ? (r.tries3 ? `${r.tries3} 次` : `${r.attempts} 次內`) : "未達";
+                              return (
+                                <tr key={l} style={{ opacity: r ? 1 : 0.45 }}>
+                                  <td>{h.n}-{l}</td>
+                                  <td>{CONTENT[h.n].levels[l - 1].title}</td>
+                                  <td style={{ textAlign: "left", color: passed ? undefined : "var(--dim)" }}>{pointOf(h.n, l)}</td>
+                                  <td style={{ color: stars >= 3 ? "var(--gold)" : undefined }}>{star}</td>
+                                  <td>{r?.attempts ?? "—"}</td>
+                                  <td style={{ color: stars >= 3 ? "var(--gold)" : "var(--dim)" }}>{to3}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  );
+                })}
+              </>
+            )}
+          </>
+        );
+      })()}
 
       {/* ---------- 選擇歷程分析 ---------- */}
       {tab === "choices" && choiceStats && (

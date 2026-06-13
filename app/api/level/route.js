@@ -68,9 +68,14 @@ export async function POST(req) {
     const k = `${p.s}-${p.c}`;
     pickCounts[k] = (pickCounts[k] || 0) + 1;
   }
+  const newAttempts = (prev.attempts || 0) + 1;
+  // tries3：第一次拿到三星時是第幾次嘗試（拿到後就固定不再更動）
+  let tries3 = prev.tries3;
+  if (tries3 == null && (prev.stars || 0) < 3 && starNum >= 3) tries3 = newAttempts;
   merged[levelId] = {
     stars: Math.max(prev.stars || 0, starNum),
-    attempts: (prev.attempts || 0) + 1,
+    attempts: newAttempts,
+    tries3,
     ts: new Date().toISOString(),
     lastPicks: cleanPicks.length ? cleanPicks : prev.lastPicks,
     pickCounts,
