@@ -52,7 +52,7 @@ export default function Game() {
   useEffect(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(SAVE_KEY) || "null");
-      if (saved) setForm(saved);
+      if (saved) setForm((f) => ({ ...f, ...saved }));
     } catch {}
   }, []);
 
@@ -302,10 +302,10 @@ export default function Game() {
             <button key={v} className="btn" style={{ textAlign: "center", borderColor: form.gender === v ? "var(--gold)" : undefined, background: form.gender === v ? "rgba(216,178,74,.25)" : undefined, marginTop: 0 }} onClick={() => setForm({ ...form, gender: v })}>{t}</button>
           ))}
         </div>
-        <label>通行碼（老師公布，例：20-800）</label>
-        <input value={form.code} maxLength={20} placeholder="例：20-800" onChange={(e) => setForm({ ...form, code: e.target.value })} />
+        <label>通行碼（老師上課公布）</label>
+        <input value={form.code || ""} maxLength={20} placeholder="請輸入老師公布的通行碼" onChange={(e) => setForm({ ...form, code: e.target.value })} />
         <div style={{ marginTop: 24 }}>
-          <button className="btn primary" disabled={busy || !form.cls || !form.seat || !form.name.trim() || !form.gender || !form.code.trim()} onClick={() => (setupNeeded ? bindGoogle(false) : login(false))}>
+          <button className="btn primary" disabled={busy || !form.cls || !form.seat || !String(form.name || "").trim() || !form.gender || !String(form.code || "").trim()} onClick={() => (setupNeeded ? bindGoogle(false) : login(false))}>
             {busy ? "進 入 中" : "領 取 長 劍"}
           </button>
         </div>
