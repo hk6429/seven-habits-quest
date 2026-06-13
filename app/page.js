@@ -227,10 +227,22 @@ export default function Game() {
       const res = await fetch("/api/level", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cls: player.cls, seat: player.seat, levelId: key, stars, picks: picksRun }),
+        body: JSON.stringify({ cls: player.cls, seat: player.seat, levelId: key, stars, picks: picksRun, knownLevels: player.levels || {} }),
       });
       const data = await res.json();
-      if (res.ok) setPlayer(data.record);
+      if (res.ok) {
+        // 防呆：把伺服器回傳與本機進度再聯集一次（取最大星數），
+        // 即使伺服器讀到舊版也不會讓畫面上已完成的關卡消失
+        setPlayer((cur) => {
+          const base = { ...(cur?.levels || {}) };
+          const next = { ...(data.record?.levels || {}) };
+          for (const [id, v] of Object.entries(base)) {
+            const b = next[id];
+            next[id] = b ? { ...b, stars: Math.max(b.stars || 0, v.stars || 0) } : v;
+          }
+          return { ...data.record, levels: next };
+        });
+      }
     } catch {
       // 成績暫存失敗也不擋遊戲；下次過關會再寫
     }
