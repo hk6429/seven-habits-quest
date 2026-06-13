@@ -36,7 +36,7 @@ export default function Game() {
     return () => clearTimeout(t);
   }, [introDone]);
   const [player, setPlayer] = useState(null);
-  const [form, setForm] = useState({ cls: "", seat: "", name: "", gender: "" });
+  const [form, setForm] = useState({ cls: "", seat: "", name: "", gender: "", code: "" });
   const [mismatchName, setMismatchName] = useState(null);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
@@ -302,8 +302,10 @@ export default function Game() {
             <button key={v} className="btn" style={{ textAlign: "center", borderColor: form.gender === v ? "var(--gold)" : undefined, background: form.gender === v ? "rgba(216,178,74,.25)" : undefined, marginTop: 0 }} onClick={() => setForm({ ...form, gender: v })}>{t}</button>
           ))}
         </div>
+        <label>通行碼（老師公布，例：20-800）</label>
+        <input value={form.code} maxLength={20} placeholder="例：20-800" onChange={(e) => setForm({ ...form, code: e.target.value })} />
         <div style={{ marginTop: 24 }}>
-          <button className="btn primary" disabled={busy || !form.cls || !form.seat || !form.name.trim() || !form.gender} onClick={() => (setupNeeded ? bindGoogle(false) : login(false))}>
+          <button className="btn primary" disabled={busy || !form.cls || !form.seat || !form.name.trim() || !form.gender || !form.code.trim()} onClick={() => (setupNeeded ? bindGoogle(false) : login(false))}>
             {busy ? "進 入 中" : "領 取 長 劍"}
           </button>
         </div>

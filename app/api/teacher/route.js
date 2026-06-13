@@ -1,13 +1,20 @@
 import { NextResponse } from "next/server";
-import { loadAllStudents, listCohorts, loadCohort, archiveAndWipe } from "@/lib/store";
+import { loadAllStudents, listCohorts, loadCohort, archiveAndWipe, loadStudentCode, saveStudentCode } from "@/lib/store";
 
 const sortStudents = (arr) =>
   arr.sort((a, b) => (a.cls === b.cls ? a.seat - b.seat : String(a.cls).localeCompare(String(b.cls))));
 
 export async function POST(req) {
-  const { pw, action, label } = await req.json();
+  const { pw, action, label, code } = await req.json();
   if (!process.env.TEACHER_PASSWORD || pw !== process.env.TEACHER_PASSWORD) {
     return NextResponse.json({ error: "密碼錯誤" }, { status: 401 });
+  }
+
+  if (action === "setcode") {
+    const clean = String(code || "").trim().slice(0, 20);
+    if (!clean) return NextResponse.json({ error: "請輸入通行碼" }, { status: 400 });
+    await saveStudentCode(clean);
+    return NextResponse.json({ ok: true, studentCode: clean });
   }
 
   if (action === "cohorts") {
@@ -30,5 +37,6 @@ export async function POST(req) {
     return NextResponse.json({ ok: true, moved, label: cleanLabel });
   }
 
-  return NextResponse.json({ students: sortStudents(await loadAllStudents()) });
+  const [students, studentCode] = await Promise.all([loadAllStudents(), loadStudentCode()]);
+  return NextResponse.json({ students: sortStudents(students), studentCode });
 }

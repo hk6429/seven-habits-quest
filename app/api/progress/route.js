@@ -1,9 +1,14 @@
 import { NextResponse } from "next/server";
-import { loadStudent, saveStudent } from "@/lib/store";
+import { loadStudent, saveStudent, loadStudentCode } from "@/lib/store";
 import { CLASSES, MAX_SEAT } from "@/lib/config";
 
 export async function POST(req) {
-  const { cls, seat, name, gender, confirmExisting } = await req.json();
+  const { cls, seat, name, gender, confirmExisting, code } = await req.json();
+
+  const expected = await loadStudentCode();
+  if (!expected || String(code || "").trim() !== expected) {
+    return NextResponse.json({ error: "通行碼不正確，請向老師確認" }, { status: 403 });
+  }
 
   const seatNum = parseInt(seat, 10);
   if (!CLASSES.includes(cls) || !seatNum || seatNum < 1 || seatNum > MAX_SEAT) {

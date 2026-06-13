@@ -43,6 +43,10 @@ export default function Teacher() {
   const [wipeConfirm, setWipeConfirm] = useState("");
   const [wipeMsg, setWipeMsg] = useState("");
 
+  const [studentCode, setStudentCode] = useState(null);
+  const [newCode, setNewCode] = useState("");
+  const [codeMsg, setCodeMsg] = useState("");
+
   async function api(body) {
     const res = await fetch("/api/teacher", {
       method: "POST",
@@ -59,6 +63,7 @@ export default function Teacher() {
     try {
       const data = await api({});
       setStudents(data.students);
+      setStudentCode(data.studentCode);
     } catch (e) {
       setErr(e.message);
     } finally {
@@ -373,6 +378,27 @@ export default function Teacher() {
 
       {/* ---------- 清除／換屆 ---------- */}
       {tab === "danger" && (
+        <>
+        <div className="card" style={{ borderLeft: "3px solid var(--gold)", maxWidth: 560 }}>
+          <h3>學生通行碼</h3>
+          <p style={{ fontSize: 14, color: "var(--dim)", marginTop: 6 }}>
+            目前通行碼：<b style={{ color: "var(--gold)", fontSize: 16 }}>{studentCode || "（尚未設定，學生無法登入）"}</b><br />
+            學生登入時必填。慣例：屆-年級，例 20-800、下一屆 21-800。
+          </p>
+          <label>更改通行碼</label>
+          <input value={newCode} maxLength={20} placeholder="例：21-800" onChange={(e) => setNewCode(e.target.value)} />
+          <div style={{ marginTop: 12 }}>
+            <button className="btn primary" disabled={busy || !newCode.trim()} onClick={async () => {
+              setCodeMsg(""); setErr(""); setBusy(true);
+              try {
+                const d = await api({ action: "setcode", code: newCode });
+                setStudentCode(d.studentCode); setNewCode("");
+                setCodeMsg(`✅ 通行碼已改為「${d.studentCode}」，立即生效。`);
+              } catch (e) { setErr(e.message); } finally { setBusy(false); }
+            }}>{busy ? "處理中⋯⋯" : "更新通行碼"}</button>
+          </div>
+          {codeMsg && <p style={{ color: "#7fd48a", marginTop: 10 }}>{codeMsg}</p>}
+        </div>
         <div className="card" style={{ borderLeft: "3px solid #c0504d", maxWidth: 560 }}>
           <h3>一鍵清除（換屆）</h3>
           <p style={{ fontSize: 14, color: "var(--dim)", marginTop: 6 }}>
@@ -390,6 +416,7 @@ export default function Teacher() {
           </div>
           {wipeMsg && <p style={{ color: "#7fd48a", marginTop: 10 }}>{wipeMsg}</p>}
         </div>
+        </>
       )}
     </div>
   );
