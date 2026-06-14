@@ -90,6 +90,24 @@ function drawCertificate(canvas, player) {
   ctx.fillText("竹光國中 ・ 自我領導力課程", W / 2, 1034);
 }
 
+// 依種子做穩定洗牌：回傳長度 n 的索引排列。
+// 同一組 (n, seed) 永遠得到同一順序 → 同場景重繪不跳動；換場景／重玩換 seed 才變。
+function shuffledOrder(n, seed) {
+  const idx = Array.from({ length: n }, (_, k) => k);
+  let a = (seed >>> 0) || 1;
+  const rnd = () => {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  for (let i = n - 1; i > 0; i--) {
+    const j = Math.floor(rnd() * (i + 1));
+    [idx[i], idx[j]] = [idx[j], idx[i]];
+  }
+  return idx;
+}
+
 export default function Game() {
   const [phase, setPhase] = useState("login"); // login | map | levels | play | result
   const [entered, setEntered] = useState(false); // 首頁敘事 → 報名
@@ -125,6 +143,7 @@ export default function Game() {
   const [earned, setEarned] = useState(0);
   const [picksRun, setPicksRun] = useState([]); // 本次闖關的選擇歷程
   const [resultStars, setResultStars] = useState(0);
+  const [runSeed, setRunSeed] = useState(0); // 每次進關的隨機種子（用來洗選項順序）
 
   useEffect(() => {
     try {
@@ -289,6 +308,7 @@ export default function Game() {
   function startLevel(h, l) {
     setHabitN(h); setLevelN(l);
     setSceneIdx(-1); setPicked(null); setEarned(0); setPicksRun([]);
+    setRunSeed(Math.floor(Math.random() * 2147483647) + 1); // 每次進關重新洗選項
     setPhase("play");
   }
 
@@ -637,9 +657,9 @@ export default function Game() {
                   <p className="dlg-text">{scene.text}</p>
                 </div>
                 <div style={{ marginTop: 4 }}>
-                  {scene.choices.map((c, i) => (
-                    <button key={i} className="btn" style={{ background: "rgba(10,11,16,.62)", marginTop: 8 }} onClick={() => pick(i)}>
-                      {c.t}
+                  {shuffledOrder(scene.choices.length, runSeed + sceneIdx * 101).map((oi) => (
+                    <button key={oi} className="btn" style={{ background: "rgba(10,11,16,.62)", marginTop: 8 }} onClick={() => pick(oi)}>
+                      {scene.choices[oi].t}
                     </button>
                   ))}
                 </div>
