@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { loadStudent, saveStudent, loadGoogleBind, saveGoogleBind, loadStudentCode } from "@/lib/store";
+import { loadStudent, saveStudent, loadGoogleBind, saveGoogleBind } from "@/lib/store";
 import { CLASSES, MAX_SEAT } from "@/lib/config";
 
 async function verifyCredential(credential) {
@@ -12,7 +12,7 @@ async function verifyCredential(credential) {
 }
 
 export async function POST(req) {
-  const { credential, cls, seat, name, gender, confirmExisting, code } = await req.json();
+  const { credential, cls, seat, name, gender, confirmExisting } = await req.json();
   if (!credential) {
     return NextResponse.json({ error: "缺少 Google 憑證" }, { status: 400 });
   }
@@ -33,11 +33,7 @@ export async function POST(req) {
     return NextResponse.json({ needSetup: true, profile: { name: info.name || "", email: info.email || "" } });
   }
 
-  // 綁定班級座號（首次需通行碼）
-  const expected = await loadStudentCode();
-  if (!expected || String(code || "").trim() !== expected) {
-    return NextResponse.json({ error: "通行碼不正確，請向老師確認" }, { status: 403 });
-  }
+  // 綁定班級座號
   const seatNum = parseInt(seat, 10);
   if (!CLASSES.includes(cls) || !seatNum || seatNum < 1 || seatNum > MAX_SEAT) {
     return NextResponse.json({ error: "班級或座號不正確" }, { status: 400 });
