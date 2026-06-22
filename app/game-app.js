@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { CLASSES, MAX_SEAT, HABITS, LEVELS_PER_HABIT, PASS_STARS, calcStars } from "@/lib/config";
 import { getLevel } from "@/lib/content";
 import { sceneFor } from "@/lib/scenes";
+import { GOD_LINES, SWORD_RARE } from "@/lib/godlines";
 
 const SAVE_KEY = "shq-login";
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
@@ -641,6 +642,11 @@ export default function GameApp({ allowStudent = true }) {
     }
     const scene = level.scenes[sceneIdx];
     const choice = picked !== null ? scene.choices[picked] : null;
+    // 古神反應 + 劍靈隱藏低語：用 runSeed 推導，確保同一次選擇穩定、重玩才變
+    const seedBase = runSeed + sceneIdx * 13 + (picked ?? 0) * 7;
+    const godPool = choice ? (choice.q === 2 ? GOD_LINES[habitN].defeat : GOD_LINES[habitN].taunt) : null;
+    const godLine = godPool ? godPool[seedBase % godPool.length] : null;
+    const rareLine = choice && seedBase % 12 === 0 ? SWORD_RARE[seedBase % SWORD_RARE.length] : null;
     return (
       <>
         <Stage img={stageScene.img} fallback={stageScene.fallback} />
@@ -670,6 +676,12 @@ export default function GameApp({ allowStudent = true }) {
             ) : (
               <>
                 <div className="dlg-echo">你的選擇：{choice.t}</div>
+                {godLine && (
+                  <div className="dialog-box" style={{ borderLeft: "3px solid var(--accent)", opacity: 0.92 }}>
+                    <span className="who" style={{ color: habit.color }}>{habit.god}</span>
+                    <p className="dlg-text">{godLine}</p>
+                  </div>
+                )}
                 <div className="dialog-box" style={{ borderLeft: "3px solid var(--accent)" }}>
                   <span className="who sword">🗡️ 劍 靈</span>
                   <p className="dlg-text">
@@ -678,6 +690,9 @@ export default function GameApp({ allowStudent = true }) {
                     {choice.q === 1 && <span style={{ color: "var(--dim)" }}>　⚡+1</span>}
                   </p>
                 </div>
+                {rareLine && (
+                  <div className="dlg-echo" style={{ marginTop: 8, fontStyle: "italic", color: "var(--gold)" }}>{rareLine}</div>
+                )}
                 <div style={{ marginTop: 14 }}>
                   <button className="btn primary" onClick={nextScene}>
                     {sceneIdx + 1 < level.scenes.length ? "繼 續" : "結 算"}
