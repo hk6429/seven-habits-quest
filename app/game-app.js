@@ -137,6 +137,10 @@ export default function GameApp({ allowStudent = true }) {
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
 
+  const [board, setBoard] = useState(null); // 班級榮耀榜資料
+  const [rechargeMsg, setRechargeMsg] = useState("");
+  const [fountains, setFountains] = useState({ body: false, mind: false, heart: false, friend: false });
+
   const [habitN, setHabitN] = useState(1);
   const [levelN, setLevelN] = useState(1);
   const [sceneIdx, setSceneIdx] = useState(-1); // -1 = intro 畫面
@@ -302,7 +306,45 @@ export default function GameApp({ allowStudent = true }) {
     setGuestPick(false);
     setStudentMode(false);
     setMismatchName(null);
+    setBoard(null);
     setPhase("login");
+  }
+
+  // ---------- 班級榮耀榜（任務二） ----------
+  async function loadBoard() {
+    setBoard(null);
+    try {
+      const res = await fetch("/api/board", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cls: player.cls }),
+      });
+      const d = await res.json();
+      if (res.ok) setBoard(d);
+    } catch {}
+  }
+
+  // ---------- 每週充電（任務四） ----------
+  async function doRecharge() {
+    setBusy(true);
+    try {
+      const res = await fetch("/api/recharge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cls: player.cls, seat: player.seat }),
+      });
+      const d = await res.json();
+      if (res.ok) {
+        setPlayer((p) => ({ ...p, recharge: d.record.recharge }));
+        setRechargeMsg(d.alreadyDone ? "本週已經充過電了 ✓　下週再來" : "⚡ 充電完成！四座泉都滿了。");
+      } else {
+        setRechargeMsg(d.error || "充電失敗，再試一次");
+      }
+    } catch {
+      setRechargeMsg("連線失敗，再試一次");
+    } finally {
+      setBusy(false);
+    }
   }
 
   // ---------- 闖關 ----------
@@ -519,7 +561,16 @@ export default function GameApp({ allowStudent = true }) {
           </div>
           <p className="title-en">The Seven Layers</p>
           <h2 style={{ textAlign: "center", letterSpacing: 8, textIndent: 8, fontSize: 26, textShadow: "0 2px 14px #000" }}>深淵地圖</h2>
-          <p className="subtitle" style={{ marginTop: 4, marginBottom: 22 }}>已突破 {totalPassed} / {LEVELS_PER_HABIT * 7} 關</p>
+          <p className="subtitle" style={{ marginTop: 4, marginBottom: 14 }}>已突破 {totalPassed} / {LEVELS_PER_HABIT * 7} 關</p>
+          <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", marginBottom: 22 }}>
+            <button className="btn ghost" style={{ width: "auto", minWidth: 0, margin: 0, fontSize: 13, padding: "8px 14px" }} onClick={() => setPhase("sword")}>🗡️ 我的劍</button>
+            {!player.guest && (
+              <>
+                <button className="btn ghost" style={{ width: "auto", minWidth: 0, margin: 0, fontSize: 13, padding: "8px 14px" }} onClick={() => { setPhase("board"); loadBoard(); }}>🏰 我們班</button>
+                <button className="btn ghost" style={{ width: "auto", minWidth: 0, margin: 0, fontSize: 13, padding: "8px 14px" }} onClick={() => { setRechargeMsg(""); setFountains({ body: false, mind: false, heart: false, friend: false }); setPhase("recharge"); }}>⚡ 本週充電{player.recharge?.streak ? `・連 ${player.recharge.streak} 週` : ""}</button>
+              </>
+            )}
+          </div>
           {totalPassed === LEVELS_PER_HABIT * 7 && (
             <div className="card" style={{ borderColor: "var(--gold)", textAlign: "center", marginBottom: 22 }}>
               <p style={{ color: "var(--gold)", fontSize: 19, letterSpacing: 2, margin: 0 }}>🏆 七層深淵全數斬破！</p>
@@ -573,6 +624,105 @@ export default function GameApp({ allowStudent = true }) {
               試玩模式的證書不含班級座號；登入後完成才會印上你的資料。
             </p>
           )}
+        </div>
+      </>
+    );
+  }
+
+  if (phase === "sword") {
+    const totalPassed = HABITS.reduce((s, h) => s + passedCount(h.n), 0);
+    const totalStars = HABITS.reduce((s, h) => {
+      let t = 0;
+      for (let l = 1; l <= LEVELS_PER_HABIT; l++) { const st = starsOf(h.n, l); if (st > 0) t += st; }
+      return s + t;
+    }, 0);
+    return (
+      <>
+        <Stage img="/layers/0.jpg" dark />
+        <div className="wrap center" style={{ paddingTop: 24 }}>
+          <p className="title-en">Your Sword of Choice</p>
+          <h2 style={{ textAlign: "center", letterSpacing: 6, fontSize: 23, margin: "6px 0 4px", textShadow: "0 2px 14px #000" }}>選擇之劍・成長軌跡</h2>
+          <p className="subtitle" style={{ marginBottom: 18 }}>已突破 {totalPassed} / 105 關　・　累計 {totalStars} ★</p>
+          <div style={{ maxWidth: 420, margin: "0 auto", width: "100%" }}>
+            {HABITS.map((h) => {
+              const pc = passedCount(h.n);
+              const done = pc === LEVELS_PER_HABIT;
+              return (
+                <div key={h.n} style={{ margin: "9px 0" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: done ? h.color : "var(--dim)", marginBottom: 4, textShadow: "0 1px 6px #000" }}>
+                    <span>{done ? "✦ " : ""}習慣{["一", "二", "三", "四", "五", "六", "七"][h.n - 1]}・{h.name}</span>
+                    <span>{done ? "已斬古神" : `${pc}/15`}</span>
+                  </div>
+                  <div style={{ height: 14, borderRadius: 7, background: "rgba(255,255,255,.06)", overflow: "hidden", border: done ? `1px solid ${h.color}` : "1px solid rgba(255,255,255,.08)" }}>
+                    <div style={{ height: "100%", width: `${(pc / LEVELS_PER_HABIT) * 100}%`, background: h.color, opacity: done ? 1 : 0.7, transition: "width .4s" }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <p style={{ fontSize: 12.5, color: "#8a8694", marginTop: 18, textShadow: "0 1px 6px #000" }}>每斬一尊古神，劍身就點亮一道光。{"\n"}七道全亮，這把劍就完全屬於你。</p>
+          <button className="btn ghost" style={{ width: "auto", minWidth: 160, margin: "18px auto 0" }} onClick={() => setPhase("map")}>← 回深淵地圖</button>
+        </div>
+      </>
+    );
+  }
+
+  if (phase === "board") {
+    return (
+      <>
+        <Stage img="/layers/0.jpg" dark />
+        <div className="wrap center" style={{ paddingTop: 24 }}>
+          <p className="title-en">Our Class Abyss</p>
+          <h2 style={{ textAlign: "center", letterSpacing: 5, fontSize: 23, margin: "6px 0 4px", textShadow: "0 2px 14px #000" }}>我們班的深淵　{player.cls} 班</h2>
+          {!board ? (
+            <p className="narration" style={{ marginTop: 20 }}>召集全班中⋯⋯</p>
+          ) : (
+            <>
+              <p className="subtitle" style={{ marginBottom: 16 }}>{board.students} 位同學　・　合力突破 {board.totalPassed} 關　・　斬破 {board.godsDefeated} / 7 尊古神</p>
+              <div style={{ maxWidth: 460, margin: "0 auto", width: "100%" }}>
+                {board.gods.map((g) => (
+                  <div key={g.n} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 13px", margin: "6px 0", borderRadius: 8, background: "rgba(10,11,16,.55)", borderLeft: `3px solid ${g.color}` }}>
+                    <span style={{ fontSize: 14 }}>第{["一", "二", "三", "四", "五", "六", "七"][g.n - 1]}層・{g.name}</span>
+                    <span style={{ fontSize: 13, color: g.defeatedBy > 0 ? g.color : "var(--dim)" }}>{g.defeatedBy > 0 ? `${g.defeatedBy} 人已斬` : "尚無人斬破"}</span>
+                  </div>
+                ))}
+              </div>
+              <p style={{ fontSize: 12.5, color: "#8a8694", marginTop: 16, textShadow: "0 1px 6px #000" }}>一個人走得快，一群人走得遠。{"\n"}你斬下的每一尊古神，都讓全班更靠近光。</p>
+            </>
+          )}
+          <button className="btn ghost" style={{ width: "auto", minWidth: 160, margin: "18px auto 0" }} onClick={() => setPhase("map")}>← 回深淵地圖</button>
+        </div>
+      </>
+    );
+  }
+
+  if (phase === "recharge") {
+    const FO = [
+      ["body", "🪨 身體", "運動、睡飽、好好吃飯"],
+      ["mind", "📖 大腦", "讀書、學新東西"],
+      ["heart", "🧘 心情", "靜下來、寫日記、感恩"],
+      ["friend", "🤝 朋友", "陪家人、幫助別人"],
+    ];
+    const allChecked = FO.every(([k]) => fountains[k]);
+    const rc = player.recharge;
+    return (
+      <>
+        <Stage img="/layers/7.jpg" dark />
+        <div className="wrap center" style={{ paddingTop: 24 }}>
+          <p className="title-en">Weekly Recharge</p>
+          <h2 style={{ textAlign: "center", letterSpacing: 5, fontSize: 23, margin: "6px 0 4px", textShadow: "0 2px 14px #000" }}>本週充電・四座泉</h2>
+          <p className="subtitle" style={{ marginBottom: 6 }}>{rc?.streak ? `連續充電 ${rc.streak} 週　・　累計 ${rc.total} 次` : "還沒開始充電——這是你的第一次"}</p>
+          <p className="narration" style={{ fontSize: 14.5, marginBottom: 16 }}>不斷更新，是每週的事。{"\n"}這一週，你照顧了哪幾座泉？{"\n"}四座都點亮，才算完整充電。</p>
+          <div className="card">
+            {FO.map(([k, label, desc]) => (
+              <button key={k} className="btn" style={{ textAlign: "left", marginTop: 8, borderColor: fountains[k] ? "var(--gold)" : undefined, background: fountains[k] ? "rgba(216,178,74,.2)" : "rgba(10,11,16,.5)" }} onClick={() => setFountains((f) => ({ ...f, [k]: !f[k] }))}>
+                {fountains[k] ? "✓ " : ""}{label}　<span style={{ fontSize: 12, color: "var(--dim)" }}>{desc}</span>
+              </button>
+            ))}
+            <button className="btn primary" style={{ marginTop: 16 }} disabled={busy || !allChecked} onClick={doRecharge}>{allChecked ? "完 成 本 週 充 電" : "四座泉都點亮才能充電"}</button>
+            {rechargeMsg && <p style={{ color: "#7fd48a", marginTop: 10, textAlign: "center" }}>{rechargeMsg}</p>}
+          </div>
+          <button className="btn ghost" style={{ width: "auto", minWidth: 160, margin: "18px auto 0" }} onClick={() => setPhase("map")}>← 回深淵地圖</button>
         </div>
       </>
     );
