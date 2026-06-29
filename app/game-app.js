@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { CLASSES, MAX_SEAT, HABITS, LEVELS_PER_HABIT, PASS_STARS, calcStars } from "@/lib/config";
+import { CLASSES, MAX_SEAT, HABITS, LEVELS_PER_HABIT, PASS_STARS, HABIT_STAR_GATE, TRAP_FAIL_LIMIT, calcStars } from "@/lib/config";
 import { getLevel } from "@/lib/content";
 import { sceneFor } from "@/lib/scenes";
 import { GOD_LINES, SWORD_RARE } from "@/lib/godlines";
@@ -149,6 +149,8 @@ export default function GameApp({ allowStudent = true }) {
   const [picksRun, setPicksRun] = useState([]); // 本次闖關的選擇歷程
   const [resultStars, setResultStars] = useState(0);
   const [runSeed, setRunSeed] = useState(0); // 每次進關的隨機種子（用來洗選項順序）
+  const [trapHits, setTrapHits] = useState(0); // 本次闖關點到陷阱選項(q=0)的次數
+  const [runFailed, setRunFailed] = useState(false); // 陷阱踩滿 → 當場判失敗
 
   useEffect(() => {
     try {
@@ -190,8 +192,17 @@ export default function GameApp({ allowStudent = true }) {
     for (let l = 1; l <= LEVELS_PER_HABIT; l++) if (starsOf(h, l) >= PASS_STARS) c++;
     return c;
   }
+  function habitStars(h) {
+    let t = 0;
+    for (let l = 1; l <= LEVELS_PER_HABIT; l++) { const s = starsOf(h, l); if (s > 0) t += s; }
+    return t;
+  }
+  // 斬掉古神 = 15 關全過 + 該層星數湊滿 43★（防亂按／低空飛過）
+  function habitCleared(h) {
+    return passedCount(h) === LEVELS_PER_HABIT && habitStars(h) >= HABIT_STAR_GATE;
+  }
   function habitUnlocked(h) {
-    return h === 1 || passedCount(h - 1) === LEVELS_PER_HABIT;
+    return h === 1 || habitCleared(h - 1);
   }
   function levelUnlocked(h, l) {
     return l === 1 || starsOf(h, l - 1) >= PASS_STARS;
@@ -351,6 +362,7 @@ export default function GameApp({ allowStudent = true }) {
   function startLevel(h, l) {
     setHabitN(h); setLevelN(l);
     setSceneIdx(-1); setPicked(null); setEarned(0); setPicksRun([]);
+    setTrapHits(0); setRunFailed(false);
     setRunSeed(Math.floor(Math.random() * 2147483647) + 1); // 每次進關重新洗選項
     setPhase("play");
   }
@@ -361,19 +373,26 @@ export default function GameApp({ allowStudent = true }) {
     const q = getLevel(habitN, levelN).scenes[sceneIdx].choices[i].q;
     setEarned((e) => e + q);
     setPicksRun((p) => [...p, { s: sceneIdx, c: i, q }]);
+    if (q === 0) {
+      // 點到陷阱選項：累計，踩滿就當場判失敗（每場景只能選一次，trapHits 即為當前值）
+      const next = trapHits + 1;
+      setTrapHits(next);
+      if (next >= TRAP_FAIL_LIMIT) setRunFailed(true);
+    }
   }
 
   async function nextScene() {
     if (sceneIdx === -1) { setSceneIdx(0); return; }
     const lv = getLevel(habitN, levelN);
-    if (sceneIdx + 1 < lv.scenes.length) {
+    // 還沒結束、也沒踩滿陷阱 → 進下一個場景
+    if (!runFailed && sceneIdx + 1 < lv.scenes.length) {
       setSceneIdx(sceneIdx + 1);
       setPicked(null);
       return;
     }
-    // 結算
+    // 結算：踩滿陷阱直接 0★ 失敗，否則照得分算星
     const finalEarned = earned;
-    const stars = calcStars(finalEarned, lv.scenes.length * 2);
+    const stars = runFailed ? 0 : calcStars(finalEarned, lv.scenes.length * 2);
     setResultStars(stars);
     setPhase("result");
     const key = `${habitN}-${levelN}`;
@@ -551,6 +570,7 @@ export default function GameApp({ allowStudent = true }) {
   if (phase === "map") {
     const hero = player.gender === "F" ? "少女劍士" : "少年劍士";
     const totalPassed = HABITS.reduce((s, h) => s + passedCount(h.n), 0);
+    const allCleared = HABITS.every((h) => habitCleared(h.n));
     return (
       <>
         <Stage img="/layers/0.jpg" dark />
@@ -571,7 +591,7 @@ export default function GameApp({ allowStudent = true }) {
               </>
             )}
           </div>
-          {totalPassed === LEVELS_PER_HABIT * 7 && (
+          {allCleared && (
             <div className="card" style={{ borderColor: "var(--gold)", textAlign: "center", marginBottom: 22 }}>
               <p style={{ color: "var(--gold)", fontSize: 19, letterSpacing: 2, margin: 0 }}>🏆 七層深淵全數斬破！</p>
               <p style={{ color: "#cfc9bd", fontSize: 13.5, margin: "8px 0 14px" }}>你已通過全部 105 道試煉，習得七個習慣。</p>
@@ -581,6 +601,8 @@ export default function GameApp({ allowStudent = true }) {
           {HABITS.map((h) => {
             const unlocked = habitUnlocked(h.n);
             const pc = passedCount(h.n);
+            const allPassed = pc === LEVELS_PER_HABIT;
+            const hs = habitStars(h.n);
             return (
               <div key={h.n} className={`habit-row${unlocked ? "" : " locked"}`}
                 style={{
@@ -595,12 +617,12 @@ export default function GameApp({ allowStudent = true }) {
                   <div className="nm">第{["一", "二", "三", "四", "五", "六", "七"][h.n - 1]}層・{h.name}</div>
                   <div className="gd">{h.god}</div>
                 </div>
-                <div className="habit-prog">{pc === LEVELS_PER_HABIT ? "✦ 已斬" : `${pc} / ${LEVELS_PER_HABIT}`}</div>
+                <div className="habit-prog">{habitCleared(h.n) ? "✦ 已斬" : allPassed ? `${hs} / ${HABIT_STAR_GATE}★` : `${pc} / ${LEVELS_PER_HABIT}`}</div>
               </div>
             );
           })}
           <p style={{ fontSize: 12.5, color: "#8a8694", textAlign: "center", marginTop: 18, textShadow: "0 1px 6px #000", whiteSpace: "pre-wrap" }}>
-            每一層 15 關全數通過（每關至少 ★★），才能下到下一層。{"\n"}已通過的關卡隨時可以重玩複習。
+            每一層 15 關全數通過、且累積滿 {HABIT_STAR_GATE}★（滿 45★），才能斬古神、下到下一層。{"\n"}星數不夠就重玩已過的關卡把 ★★ 磨成 ★★★——成績取最佳。
           </p>
         </div>
       </>
@@ -646,12 +668,14 @@ export default function GameApp({ allowStudent = true }) {
           <div style={{ maxWidth: 420, margin: "0 auto", width: "100%" }}>
             {HABITS.map((h) => {
               const pc = passedCount(h.n);
-              const done = pc === LEVELS_PER_HABIT;
+              const hs = habitStars(h.n);
+              const done = habitCleared(h.n);
+              const allPassed = pc === LEVELS_PER_HABIT;
               return (
                 <div key={h.n} style={{ margin: "9px 0" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: done ? h.color : "var(--dim)", marginBottom: 4, textShadow: "0 1px 6px #000" }}>
                     <span>{done ? "✦ " : ""}習慣{["一", "二", "三", "四", "五", "六", "七"][h.n - 1]}・{h.name}</span>
-                    <span>{done ? "已斬古神" : `${pc}/15`}</span>
+                    <span>{done ? "已斬古神" : allPassed ? `${hs}/${HABIT_STAR_GATE}★` : `${pc}/15`}</span>
                   </div>
                   <div style={{ height: 14, borderRadius: 7, background: "rgba(255,255,255,.06)", overflow: "hidden", border: done ? `1px solid ${h.color}` : "1px solid rgba(255,255,255,.08)" }}>
                     <div style={{ height: "100%", width: `${(pc / LEVELS_PER_HABIT) * 100}%`, background: h.color, opacity: done ? 1 : 0.7, transition: "width .4s" }} />
@@ -730,6 +754,8 @@ export default function GameApp({ allowStudent = true }) {
 
   if (phase === "levels") {
     const pc = passedCount(habitN);
+    const hs = habitStars(habitN);
+    const cleared = habitCleared(habitN);
     return (
       <>
         <Stage img={`/layers/${habitN}.jpg`} />
@@ -759,7 +785,10 @@ export default function GameApp({ allowStudent = true }) {
             })}
           </div>
           <p style={{ fontSize: 12.5, color: "var(--gold)", marginTop: 14, letterSpacing: 1, textShadow: "0 1px 6px #000" }}>1 序幕｜2–5 校園｜6–9 家裡｜10–12 深夜與同儕｜13 神器之間｜14 風暴將至｜15 決戰古神</p>
-          <p style={{ fontSize: 12.5, color: "#8a8694", marginTop: 6, textShadow: "0 1px 6px #000" }}>★★ 以上算通過。點已通過的關卡可重玩複習，成績取最佳。</p>
+          <p style={{ fontSize: 12.5, color: cleared ? habit.color : "var(--gold)", marginTop: 8, textShadow: "0 1px 6px #000" }}>
+            本層星數 {hs} / {HABIT_STAR_GATE}★　{cleared ? "✦ 已斬古神，下一層已開啟！" : pc === LEVELS_PER_HABIT ? `15 關全過了，再磨亮 ${HABIT_STAR_GATE - hs} 顆星就能斬古神（重玩把 ★★ 拚成 ★★★）` : `要 15 關全過 + 滿 ${HABIT_STAR_GATE}★ 才能斬古神`}
+          </p>
+          <p style={{ fontSize: 12.5, color: "#8a8694", marginTop: 6, textShadow: "0 1px 6px #000" }}>★★ 以上算過關，成績取最佳。⚠️ 一關內連選 {TRAP_FAIL_LIMIT} 個錯誤（陷阱）選項，當場失敗。</p>
         </div>
       </>
     );
@@ -845,7 +874,7 @@ export default function GameApp({ allowStudent = true }) {
                 )}
                 <div style={{ marginTop: 14 }}>
                   <button className="btn primary" onClick={nextScene}>
-                    {sceneIdx + 1 < level.scenes.length ? "繼 續" : "結 算"}
+                    {runFailed ? "你被纏住了・結 算" : sceneIdx + 1 < level.scenes.length ? "繼 續" : "結 算"}
                   </button>
                 </div>
               </>
@@ -867,9 +896,9 @@ export default function GameApp({ allowStudent = true }) {
           <p className="title-en" style={{ color: habit.color }}>{passed ? "Victory" : "Try Again"}</p>
           <h3 style={{ color: habit.color, textAlign: "center", fontSize: 24, letterSpacing: 4, textShadow: "0 2px 14px #000" }}>{level.title}</h3>
           <div className="stars">{"★".repeat(resultStars)}{"☆".repeat(3 - resultStars)}</div>
-          <p className="narration" style={{ fontWeight: 700, marginBottom: 14 }}>{passed ? (level.type === "boss" ? `你斬落了${habit.god}！` : "通過！") : "古神的絲線還纏著你⋯⋯再試一次"}</p>
+          <p className="narration" style={{ fontWeight: 700, marginBottom: 14 }}>{passed ? (level.type === "boss" ? `你斬落了${habit.god}！` : "通過！") : runFailed ? "你連續踩進古神的陷阱，當場被絲線纏住——這一關判定失敗。" : "古神的絲線還纏著你⋯⋯再試一次"}</p>
           <p className="narration" style={{ fontSize: 15.5, color: passed ? "var(--text)" : "var(--dim)" }}>
-            {passed ? level.outro : "別擔心，這裡不是考試。重新進關，注意劍靈的提示——哪些選擇讓劍充能、哪些讓絲線收緊。"}
+            {passed ? level.outro : runFailed ? "亂猜會被反噬。重新進關，先看懂題目，再下劍——連踩兩個錯誤選項就會直接出局。" : "別擔心，這裡不是考試。重新進關，注意劍靈的提示——哪些選擇讓劍充能、哪些讓絲線收緊。"}
           </p>
           <div style={{ marginTop: 30 }}>
             {!passed && <button className="btn primary" onClick={() => startLevel(habitN, levelN)}>再 戰 一 次</button>}

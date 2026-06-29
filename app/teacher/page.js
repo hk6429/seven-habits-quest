@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { HABITS, LEVELS_PER_HABIT, PASS_STARS } from "@/lib/config";
+import { HABITS, LEVELS_PER_HABIT, PASS_STARS, HABIT_STAR_GATE } from "@/lib/config";
+
+const HABIT_MAX_STARS = LEVELS_PER_HABIT * 3; // 一大關滿星 = 45
+const TOTAL_MAX_STARS = HABIT_MAX_STARS * 7;  // 全站滿星 = 315
 import { CONTENT } from "@/lib/content";
 import { pointOf } from "@/lib/points";
 
@@ -15,16 +18,20 @@ const TABS = [
 
 function summarize(s) {
   let totalStars = 0, totalAttempts = 0, passed = 0;
+  const perHabitStars = [];
   const perHabit = HABITS.map((h) => {
-    let c = 0;
+    let c = 0, hs = 0;
     for (let l = 1; l <= LEVELS_PER_HABIT; l++) {
       const r = s.levels?.[`${h.n}-${l}`];
-      if (r) { totalStars += r.stars; totalAttempts += r.attempts; if (r.stars >= PASS_STARS) c++; }
+      if (r) { totalStars += r.stars; hs += r.stars; totalAttempts += r.attempts; if (r.stars >= PASS_STARS) c++; }
     }
+    perHabitStars.push(hs);
     passed += c;
     return c;
   });
-  return { perHabit, totalStars, totalAttempts, passed };
+  // 斬古神 = 15 關全過 + 該層 ≥ 43★
+  const godsCleared = perHabit.filter((c, i) => c === LEVELS_PER_HABIT && perHabitStars[i] >= HABIT_STAR_GATE).length;
+  return { perHabit, perHabitStars, totalStars, totalAttempts, passed, godsCleared };
 }
 
 export default function Teacher() {
@@ -165,11 +172,11 @@ export default function Teacher() {
   }, [students, cohortData, cohortSel]);
 
   function exportCSV(pool, suffix) {
-    const head = ["班級", "座號", "姓名", "性別", ...HABITS.map((h) => `習慣${h.n}通過數`), "總星數", "總嘗試次數", "最後活動"];
+    const head = ["班級", "座號", "姓名", "性別", ...HABITS.map((h) => `習慣${h.n}通過數`), ...HABITS.map((h) => `習慣${h.n}星數`), "總星數", "斬神數", "總嘗試次數", "最後活動"];
     const lines = [head.join(",")];
     for (const s of pool) {
-      const { perHabit, totalStars, totalAttempts } = summarize(s);
-      lines.push([s.cls, s.seat, s.name, s.gender === "F" ? "女" : "男", ...perHabit, totalStars, totalAttempts, (s.updatedAt || "").slice(0, 16).replace("T", " ")].join(","));
+      const { perHabit, perHabitStars, totalStars, totalAttempts, godsCleared } = summarize(s);
+      lines.push([s.cls, s.seat, s.name, s.gender === "F" ? "女" : "男", ...perHabit, ...perHabitStars, totalStars, godsCleared, totalAttempts, (s.updatedAt || "").slice(0, 16).replace("T", " ")].join(","));
     }
     const blob = new Blob(["﻿" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
     const a = document.createElement("a");
@@ -236,25 +243,40 @@ export default function Teacher() {
       {tab === "progress" && (
         <>
           <h3 style={{ margin: "10px 0" }}>完成度矩陣 <button style={{ marginLeft: 10, fontSize: 13 }} onClick={() => exportCSV(shown, clsFilter)}>匯出 CSV</button></h3>
+          <p style={{ fontSize: 12.5, color: "var(--dim)", margin: "0 0 8px" }}>
+            每個習慣格上排＝過關數 / 15，下排＝該層星數（滿 {HABIT_MAX_STARS}★）。
+            <span style={{ color: "#7fd48a" }}>　綠＝已斬古神（15 關全過且 ≥{HABIT_STAR_GATE}★）</span>
+            <span style={{ color: "#e0c050" }}>　黃＝15 關全過但星數未滿 {HABIT_STAR_GATE}（卡在門檻）</span>
+          </p>
           <div className="scroll-x card" style={{ padding: 8 }}>
             <table className="matrix">
               <thead>
                 <tr>
                   <th>班級</th><th>座號</th><th>姓名</th>
                   {HABITS.map((h) => <th key={h.n} title={h.name}>習{h.n}</th>)}
-                  <th>總★</th><th>嘗試</th><th>最後活動</th>
+                  <th>總★</th><th>斬神</th><th>嘗試</th><th>最後活動</th>
                 </tr>
               </thead>
               <tbody>
                 {shown.map((s) => {
-                  const { perHabit, totalStars, totalAttempts } = summarize(s);
+                  const { perHabit, perHabitStars, totalStars, totalAttempts, godsCleared } = summarize(s);
                   return (
                     <tr key={`${s.cls}-${s.seat}`}>
                       <td>{s.cls}</td><td>{s.seat}</td><td>{s.name}</td>
-                      {perHabit.map((c, i) => (
-                        <td key={i} style={{ background: c === LEVELS_PER_HABIT ? "#1d3a26" : c > 0 ? "#2a2f1e" : undefined }}>{c}/{LEVELS_PER_HABIT}</td>
-                      ))}
-                      <td>{totalStars}</td><td>{totalAttempts}</td>
+                      {perHabit.map((c, i) => {
+                        const hs = perHabitStars[i];
+                        const allPassed = c === LEVELS_PER_HABIT;
+                        const cleared = allPassed && hs >= HABIT_STAR_GATE;
+                        return (
+                          <td key={i} style={{ background: cleared ? "#1d3a26" : allPassed ? "#3a341d" : c > 0 ? "#2a2f1e" : undefined, lineHeight: 1.2 }}>
+                            <div>{c}/{LEVELS_PER_HABIT}</div>
+                            <div style={{ fontSize: 11, color: cleared ? "#7fd48a" : allPassed ? "#e0c050" : "var(--dim)" }}>{hs}★</div>
+                          </td>
+                        );
+                      })}
+                      <td>{totalStars}<span style={{ fontSize: 11, color: "var(--dim)" }}> / {TOTAL_MAX_STARS}</span></td>
+                      <td style={{ color: godsCleared === 7 ? "#7fd48a" : "var(--gold)" }}>{godsCleared}/7</td>
+                      <td>{totalAttempts}</td>
                       <td>{(s.updatedAt || "").slice(5, 16).replace("T", " ")}</td>
                     </tr>
                   );
@@ -302,23 +324,29 @@ export default function Teacher() {
                 <div className="card" style={{ borderLeft: "3px solid var(--gold)" }}>
                   <b>{stu.cls} 班 {stu.seat} 號 {stu.name}</b>　已掌握知識點{" "}
                   <b style={{ color: "var(--gold)" }}>{totalPassed} / {LEVELS_PER_HABIT * 7}</b>
-                  　|　完成的習慣{" "}
-                  <b style={{ color: "var(--gold)" }}>{summarize(stu).perHabit.filter((c) => c === LEVELS_PER_HABIT).length} / 7</b>
+                  　|　已斬古神{" "}
+                  <b style={{ color: "var(--gold)" }}>{summarize(stu).godsCleared} / 7</b>
+                  　|　總星數{" "}
+                  <b style={{ color: "var(--gold)" }}>{summarize(stu).totalStars} / {TOTAL_MAX_STARS}</b>
                   <p style={{ color: "var(--dim)", fontSize: 12.5, marginTop: 6 }}>
                     全部 105 關完成＝掌握七個習慣的全部 105 個核心知識點。
                   </p>
                 </div>
 
                 {HABITS.map((h) => {
-                  let mastered = 0;
+                  let mastered = 0, hs = 0;
                   for (let l = 1; l <= LEVELS_PER_HABIT; l++) {
-                    if ((stu.levels?.[`${h.n}-${l}`]?.stars ?? 0) >= PASS_STARS) mastered++;
+                    const st = stu.levels?.[`${h.n}-${l}`]?.stars ?? 0;
+                    if (st >= PASS_STARS) mastered++;
+                    if (st > 0) hs += st;
                   }
+                  const cleared = mastered === LEVELS_PER_HABIT && hs >= HABIT_STAR_GATE;
                   return (
                     <div key={h.n} style={{ marginTop: 14 }}>
                       <h4 style={{ margin: "6px 0", color: h.color }}>
                         第{["一", "二", "三", "四", "五", "六", "七"][h.n - 1]}層・{h.name}
                         <span style={{ color: "var(--dim)", fontWeight: 400, fontSize: 13 }}>　已掌握 {mastered} / {LEVELS_PER_HABIT} 個知識點</span>
+                        <span style={{ fontWeight: 400, fontSize: 13, color: cleared ? "#7fd48a" : hs > 0 ? "#e0c050" : "var(--dim)" }}>　・星數 {hs} / {HABIT_MAX_STARS}{cleared ? "　✦ 已斬古神" : mastered === LEVELS_PER_HABIT ? `（差 ${HABIT_STAR_GATE - hs} 顆到 ${HABIT_STAR_GATE}★）` : ""}</span>
                       </h4>
                       <div className="scroll-x card" style={{ padding: 8 }}>
                         <table className="matrix">

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { loadAllStudents } from "@/lib/store";
-import { CLASSES, HABITS, LEVELS_PER_HABIT, PASS_STARS } from "@/lib/config";
+import { CLASSES, HABITS, LEVELS_PER_HABIT, PASS_STARS, HABIT_STAR_GATE } from "@/lib/config";
 
 // 任務二：班級榮耀榜（集體進度，不曝光個人姓名/分數，純鼓勵）
 function passedCount(levels, n) {
@@ -9,6 +9,11 @@ function passedCount(levels, n) {
     if ((levels?.[`${n}-${l}`]?.stars || 0) >= PASS_STARS) c++;
   }
   return c;
+}
+function habitStars(levels, n) {
+  let t = 0;
+  for (let l = 1; l <= LEVELS_PER_HABIT; l++) t += (levels?.[`${n}-${l}`]?.stars || 0);
+  return t;
 }
 
 export async function POST(req) {
@@ -23,7 +28,7 @@ export async function POST(req) {
     for (const s of mine) {
       const pc = passedCount(s.levels, h.n);
       totalPassed += pc;
-      if (pc === LEVELS_PER_HABIT) defeatedBy++;
+      if (pc === LEVELS_PER_HABIT && habitStars(s.levels, h.n) >= HABIT_STAR_GATE) defeatedBy++;
     }
     return { n: h.n, name: h.name, god: h.god, color: h.color, defeatedBy };
   });
