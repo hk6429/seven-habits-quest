@@ -95,7 +95,11 @@ export default function Teacher() {
   }, [cohortSel]);
 
   const classes = useMemo(() => students ? [...new Set(students.map((s) => s.cls))] : [], [students]);
-  const shown = useMemo(() => students?.filter((s) => clsFilter === "全部" || s.cls === clsFilter) ?? [], [students, clsFilter]);
+  const shown = useMemo(() =>
+    (students?.filter((s) => clsFilter === "全部" || s.cls === clsFilter) ?? [])
+      .slice()
+      .sort((a, b) => String(a.cls).localeCompare(String(b.cls)) || (parseInt(a.seat, 10) || 0) - (parseInt(b.seat, 10) || 0)),
+    [students, clsFilter]);
 
   // 卡關率
   const stuck = useMemo(() => {
