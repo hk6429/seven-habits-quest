@@ -189,6 +189,79 @@ export default function Teacher() {
     a.click();
   }
 
+  // 把「選擇歷程分析」7 個習慣全部匯成 TXT（跟著目前班級篩選 shown 走）
+  function downloadChoiceTxt() {
+    const pool = shown;
+    const CN = ["一", "二", "三", "四", "五", "六", "七"];
+    const out = [];
+    out.push("七個習慣・心之深淵　選擇歷程分析（全習慣）");
+    out.push(`班級篩選：${clsFilter}　|　學生數：${pool.length}　|　匯出：2026-06-29`);
+    out.push("評分：+2＝最佳示範　+1＝普通　0＝陷阱（錯誤示範，連選 2 個當場失敗）");
+    out.push("長條＝選該選項的比例；括號內＝人次");
+    out.push("=".repeat(66));
+    let grandAll = 0, grandBest = 0;
+    for (let h = 1; h <= 7; h++) {
+      const meta = HABITS[h - 1];
+      const levels = [];
+      const traps = [];
+      let hAll = 0, hBest = 0;
+      for (let l = 1; l <= LEVELS_PER_HABIT; l++) {
+        const id = `${h}-${l}`;
+        const lv = CONTENT[h].levels[l - 1];
+        const scenes = lv.scenes.map((sc, si) => {
+          const counts = sc.choices.map(() => 0);
+          for (const s of pool) {
+            const pc = s.levels?.[id]?.pickCounts;
+            if (!pc) continue;
+            sc.choices.forEach((_, ci) => { counts[ci] += pc[`${si}-${ci}`] || 0; });
+          }
+          const total = counts.reduce((a, b) => a + b, 0);
+          sc.choices.forEach((c, ci) => {
+            hAll += counts[ci]; if (c.q === 2) hBest += counts[ci];
+            if (c.q === 0 && total >= 3 && counts[ci] / total >= 0.3) {
+              traps.push({ l, title: lv.title, choiceText: c.t, n: counts[ci], pct: counts[ci] / total });
+            }
+          });
+          return { text: sc.text, total, choices: sc.choices.map((c, ci) => ({ t: c.t, q: c.q, n: counts[ci], pct: total ? counts[ci] / total : 0 })) };
+        });
+        if (scenes.some((s) => s.total > 0)) levels.push({ l, title: lv.title, scenes });
+      }
+      grandAll += hAll; grandBest += hBest;
+      out.push("");
+      out.push("█".repeat(66));
+      out.push(`第${CN[h - 1]}層　習慣${h}・${meta.name}　—　${meta.god}`);
+      out.push(`最佳選擇率（選到 +2 的比例）：${hAll ? Math.round((hBest / hAll) * 100) + "%" : "—"}　|　累計選擇 ${hAll} 次`);
+      if (traps.length) {
+        traps.sort((a, b) => b.pct - a.pct);
+        out.push("⚠️ 高踩雷選項（≥30% 的人選了 0 分選項，最值得課堂攤開談）：");
+        traps.slice(0, 8).forEach((t) => out.push(`   ${h}-${t.l}〈${t.title}〉 ${Math.round(t.pct * 100)}%（${t.n} 人次）「${t.choiceText.slice(0, 50)}」`));
+      }
+      out.push("█".repeat(66));
+      if (!levels.length) { out.push("（這個習慣還沒有選擇紀錄）"); continue; }
+      for (const lvl of levels) {
+        out.push("");
+        out.push(`── ${h}-${lvl.l}　${lvl.title}`);
+        lvl.scenes.forEach((sc, si) => {
+          if (!sc.total) return;
+          out.push(`  【場景 ${si + 1}】${sc.text.replace(/\n/g, " ").slice(0, 90)}`);
+          sc.choices.forEach((c, ci) => {
+            const tag = c.q === 2 ? "+2" : c.q === 1 ? "+1" : " 0";
+            const bar = "█".repeat(Math.round(c.pct * 20)).padEnd(20, "·");
+            out.push(`    ${String.fromCharCode(65 + ci)}. [${tag}] ${bar} ${Math.round(c.pct * 100)}%（${c.n}）${c.t.slice(0, 46)}`);
+          });
+        });
+      }
+    }
+    out.push("");
+    out.push("=".repeat(66));
+    out.push(`全部累計：選擇 ${grandAll} 次　整體最佳選擇率 ${grandAll ? Math.round((grandBest / grandAll) * 100) : 0}%`);
+    const blob = new Blob(["﻿" + out.join("\n")], { type: "text/plain;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `選擇歷程分析_全習慣_${clsFilter}.txt`;
+    a.click();
+  }
+
   async function doWipe() {
     setWipeMsg(""); setErr("");
     setBusy(true);
@@ -394,6 +467,7 @@ export default function Teacher() {
             <select style={{ width: "auto", padding: "4px 8px", fontSize: 13 }} value={habitSel} onChange={(e) => setHabitSel(parseInt(e.target.value, 10))}>
               {HABITS.map((h) => <option key={h.n} value={h.n}>習慣{h.n}・{h.name}</option>)}
             </select>
+            <button style={{ fontSize: 13 }} onClick={downloadChoiceTxt}>下載全部習慣 TXT</button>
           </div>
 
           <div className="card" style={{ borderLeft: "3px solid var(--gold)" }}>
